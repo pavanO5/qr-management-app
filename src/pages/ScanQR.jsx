@@ -5,13 +5,19 @@ import { supabase } from "../supabase";
 function ScanQR({ location }) {
   useEffect(() => {
     const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      {
-        fps: 10,
-        qrbox: 250,
-      },
-      false
-    );
+  "qr-reader",
+  {
+    fps: 10,
+    qrbox: { width: 250, height: 250 },
+    rememberLastUsedCamera: false,
+    supportedScanTypes: [Html5QrcodeScanner.SCAN_TYPE_CAMERA],
+    videoConstraints: {
+      facingMode: { exact: "environment" }
+    }
+  },
+  false
+);
+
 
     scanner.render(
       async (decodedText) => {
