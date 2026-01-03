@@ -5,28 +5,24 @@ import { supabase } from "../supabase";
 function ScanQR({ location }) {
   useEffect(() => {
     const scanner = new Html5QrcodeScanner(
-  "qr-reader",
-  {
-    fps: 10,
-    qrbox: { width: 250, height: 250 },
-    rememberLastUsedCamera: false,
-    supportedScanTypes: [Html5QrcodeScanner.SCAN_TYPE_CAMERA],
-    videoConstraints: {
-      facingMode: { exact: "environment" }
-    }
-  },
-  false
-);
-
+      "qr-reader",
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        rememberLastUsedCamera: false,
+        videoConstraints: {
+          facingMode: "environment"   // ✅ correct
+        }
+      },
+      false
+    );
 
     scanner.render(
       async (decodedText) => {
-        scanner.clear();
+        await scanner.clear();
         await handleScan(decodedText);
       },
-      (error) => {
-        // ignore scan errors
-      }
+      () => {}
     );
 
     return () => {
@@ -35,51 +31,48 @@ function ScanQR({ location }) {
   }, []);
 
   const handleScan = async (rawQrValue) => {
-  const qrValue = rawQrValue.trim();
+    const qrValue = rawQrValue.trim();
 
-  const { data, error } = await supabase
-    .from("qr_codes")
-    .select("*")
-    .eq("qr_value", qrValue);
+    const { data, error } = await supabase
+      .from("qr_codes")
+      .select("*")
+      .eq("qr_value", qrValue);
 
-  if (error || !data || data.length === 0) {
-    alert("Invalid QR code");
-    return;
-  }
-
-  const qr = data[0];
-
-  if (!qr.is_active) {
-    alert("QR code expired");
-    return;
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  await supabase.from("scans").insert({
-    qr_id: qr.id,
-    user_id: user.id,
-    latitude: location.latitude,
-    longitude: location.longitude,
-  });
-
-  const { error: updateError } = await supabase.rpc(
-    "increment_scan_count",
-    {
-      qr_id_input: qr.id
+    if (error || !data || data.length === 0) {
+      alert("Invalid QR code");
+      return;
     }
-  );
 
-  if (updateError) {
-    alert("QR scan limit reached");
-    return;
-  }
+    const qr = data[0];
 
-  alert("QR scanned successfully");
-};
+    if (!qr.is_active) {
+      alert("QR code expired");
+      return;
+    }
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    await supabase.from("scans").insert({
+      qr_id: qr.id,
+      user_id: user.id,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    });
+
+    const { error: updateError } = await supabase.rpc(
+      "increment_scan_count",
+      { qr_id_input: qr.id }
+    );
+
+    if (updateError) {
+      alert("QR scan limit reached");
+      return;
+    }
+
+    alert("QR scanned successfully");
+  };
 
   return (
     <div style={{ padding: "20px" }}>
