@@ -5,6 +5,8 @@ import { QRCodeCanvas } from "qrcode.react";
 function AdminDashboard() {
   const [count, setCount] = useState(1);
   const [maxScans, setMaxScans] = useState(1);
+  const [qrName, setQrName] = useState("");
+  const [qrDescription, setQrDescription] = useState("");
   const [logs, setLogs] = useState([]);
   const [qrCodes, setQrCodes] = useState([]);
 
@@ -12,12 +14,19 @@ function AdminDashboard() {
   // Generate QR Codes
   // ----------------------------
   const generateQRCodes = async () => {
+    if (!qrName.trim()) {
+      alert("Please enter QR name");
+      return;
+    }
+
     const records = [];
 
     for (let i = 0; i < count; i++) {
       records.push({
         qr_value: crypto.randomUUID(),
         max_scans: maxScans,
+        name: qrName,
+        description: qrDescription,
       });
     }
 
@@ -27,13 +36,15 @@ function AdminDashboard() {
       alert(error.message);
     } else {
       alert(`${count} QR codes generated`);
+      setQrName("");
+      setQrDescription("");
       fetchQRCodes();
       fetchLogs();
     }
   };
 
   // ----------------------------
-  // Fetch QR Codes (for images)
+  // Fetch QR Codes
   // ----------------------------
   const fetchQRCodes = async () => {
     const { data, error } = await supabase
@@ -41,9 +52,7 @@ function AdminDashboard() {
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (!error) {
-      setQrCodes(data);
-    }
+    if (!error) setQrCodes(data);
   };
 
   // ----------------------------
@@ -57,18 +66,17 @@ function AdminDashboard() {
         scanned_at,
         latitude,
         longitude,
-        qr_codes ( qr_value )
+        qr_codes (
+          qr_value,
+          name,
+          description
+        )
       `)
       .order("scanned_at", { ascending: false });
 
-    if (!error) {
-      setLogs(data);
-    }
+    if (!error) setLogs(data);
   };
 
-  // ----------------------------
-  // Initial Load
-  // ----------------------------
   useEffect(() => {
     fetchQRCodes();
     fetchLogs();
@@ -78,10 +86,24 @@ function AdminDashboard() {
     <div style={{ marginTop: "20px" }}>
       <h3>Admin Dashboard</h3>
 
-      {/* ============================
-          QR GENERATION
-      ============================ */}
+      {/* ---------------- QR GENERATION ---------------- */}
       <h4>Generate QR Codes</h4>
+
+      <label>QR Name</label>
+      <input
+        type="text"
+        placeholder="e.g. Library Entry"
+        value={qrName}
+        onChange={(e) => setQrName(e.target.value)}
+      />
+
+      <label>QR Description</label>
+      <input
+        type="text"
+        placeholder="e.g. Staff Only"
+        value={qrDescription}
+        onChange={(e) => setQrDescription(e.target.value)}
+      />
 
       <label>Number of QR Codes</label>
       <input
@@ -105,9 +127,7 @@ function AdminDashboard() {
 
       <hr />
 
-      {/* ============================
-          QR CODE IMAGES
-      ============================ */}
+      {/* ---------------- QR DISPLAY ---------------- */}
       <h4>Generated QR Codes</h4>
 
       {qrCodes.length === 0 && <p>No QR codes generated yet</p>}
@@ -115,7 +135,7 @@ function AdminDashboard() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
           gap: "16px",
         }}
       >
@@ -130,8 +150,12 @@ function AdminDashboard() {
           >
             <QRCodeCanvas value={qr.qr_value} size={120} />
 
+            <p><strong>{qr.name}</strong></p>
+            <p style={{ fontSize: "12px", color: "#555" }}>
+              {qr.description}
+            </p>
 
-            <p style={{ fontSize: "12px", wordBreak: "break-all" }}>
+            <p style={{ fontSize: "11px", wordBreak: "break-all" }}>
               {qr.qr_value}
             </p>
 
@@ -150,9 +174,7 @@ function AdminDashboard() {
 
       <hr />
 
-      {/* ============================
-          SCAN LOGS
-      ============================ */}
+      {/* ---------------- SCAN LOGS ---------------- */}
       <h4>Scan Logs</h4>
 
       {logs.length === 0 && <p>No scans yet</p>}
@@ -166,7 +188,8 @@ function AdminDashboard() {
             marginBottom: "10px",
           }}
         >
-          <p><strong>QR:</strong> {log.qr_codes?.qr_value}</p>
+          <p><strong>QR Name:</strong> {log.qr_codes?.name}</p>
+          <p><strong>Description:</strong> {log.qr_codes?.description}</p>
           <p><strong>Time:</strong> {new Date(log.scanned_at).toLocaleString()}</p>
           <p><strong>Latitude:</strong> {log.latitude}</p>
           <p><strong>Longitude:</strong> {log.longitude}</p>

@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { supabase } from "../supabase";
+import { useNavigate } from "react-router-dom";
+
 
 function ScanQR({ location }) {
   useEffect(() => {
