@@ -3,8 +3,9 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 import { supabase } from "../supabase";
 import { useNavigate } from "react-router-dom";
 
-
 function ScanQR({ location }) {
+  const navigate = useNavigate();
+
   useEffect(() => {
     const scanner = new Html5QrcodeScanner(
       "qr-reader",
@@ -13,8 +14,8 @@ function ScanQR({ location }) {
         qrbox: { width: 250, height: 250 },
         rememberLastUsedCamera: false,
         videoConstraints: {
-          facingMode: "environment"   // ✅ correct
-        }
+          facingMode: "environment", // back camera
+        },
       },
       false
     );
@@ -35,45 +36,57 @@ function ScanQR({ location }) {
   const handleScan = async (rawQrValue) => {
     const qrValue = rawQrValue.trim();
 
-    const { data, error } = await supabase
+    // 1️⃣ Fetch QR
+    const { data: qrData, error } = await supabase
       .from("qr_codes")
       .select("*")
-      .eq("qr_value", qrValue);
+      .eq("qr_value", qrValue)
+      .single();
 
-    if (error || !data || data.length === 0) {
-      alert("Invalid QR code");
+    if (error || !qrData) {
+      alert("Invalid QR Code");
       return;
     }
 
-    const qr = data[0];
-
-    if (!qr.is_active) {
-      alert("QR code expired");
+    if (!qrData.is_active) {
+      alert("QR Code expired");
       return;
     }
 
+    // 2️⃣ Get logged-in user
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    await supabase.from("scans").insert({
-      qr_id: qr.id,
-      user_id: user.id,
-      latitude: location.latitude,
-      longitude: location.longitude,
-    });
-
-    const { error: updateError } = await supabase.rpc(
-      "increment_scan_count",
-      { qr_id_input: qr.id }
-    );
-
-    if (updateError) {
-      alert("QR scan limit reached");
+    if (!user) {
+      alert("User not logged in");
       return;
     }
 
-    alert("QR scanned successfully");
+    // 3️⃣ Insert scan log
+    await supabase.from("scans").insert({
+      qr_id: qrData.id,
+      user_id: user.id,
+      latitude: location?.latitude || null,
+      longitude: location?.longitude || null,
+    });
+
+    // 4️⃣ Assign riddle (MAIN LOGIC)
+    const { error: assignError } = await supabase.rpc(
+      "assign_riddle",
+      {
+        p_user_id: user.id,
+        p_qr_id: qrData.id,
+      }
+    );
+
+    if (assignError) {
+      alert(assignError.message);
+      return;
+    }
+
+    // 5️⃣ Redirect to riddle page
+    navigate("/riddle");
   };
 
   return (

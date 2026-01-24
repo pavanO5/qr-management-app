@@ -3,196 +3,201 @@ import { supabase } from "../supabase";
 import { QRCodeCanvas } from "qrcode.react";
 
 function AdminDashboard() {
-  const [count, setCount] = useState(1);
-  const [maxScans, setMaxScans] = useState(1);
+  const [qrCodes, setQrCodes] = useState([]);
+  const [riddles, setRiddles] = useState([]);
+  const [logs, setLogs] = useState([]);
+
   const [qrName, setQrName] = useState("");
   const [qrDescription, setQrDescription] = useState("");
-  const [logs, setLogs] = useState([]);
-  const [qrCodes, setQrCodes] = useState([]);
+  const [qrCount, setQrCount] = useState(1);
+  const [maxScans, setMaxScans] = useState(1);
 
-  // ----------------------------
-  // Generate QR Codes
-  // ----------------------------
-  const generateQRCodes = async () => {
-    if (!qrName.trim()) {
-      alert("Please enter QR name");
-      return;
-    }
+  const [riddleTitle, setRiddleTitle] = useState("");
+  const [riddleText, setRiddleText] = useState("");
 
-    const records = [];
-
-    for (let i = 0; i < count; i++) {
-      records.push({
-        qr_value: crypto.randomUUID(),
-        max_scans: maxScans,
-        name: qrName,
-        description: qrDescription,
-      });
-    }
-
-    const { error } = await supabase.from("qr_codes").insert(records);
-
-    if (error) {
-      alert(error.message);
-    } else {
-      alert(`${count} QR codes generated`);
-      setQrName("");
-      setQrDescription("");
-      fetchQRCodes();
-      fetchLogs();
-    }
-  };
-
-  // ----------------------------
-  // Fetch QR Codes
-  // ----------------------------
-  const fetchQRCodes = async () => {
-    const { data, error } = await supabase
+  /* ===========================
+     FETCH DATA
+  ============================ */
+  const fetchAll = async () => {
+    const { data: qrData } = await supabase
       .from("qr_codes")
-      .select("*")
+      .select("*, riddles(title)")
       .order("created_at", { ascending: false });
 
-    if (!error) setQrCodes(data);
-  };
+    const { data: riddleData } = await supabase
+      .from("riddles")
+      .select("*");
 
-  // ----------------------------
-  // Fetch Scan Logs
-  // ----------------------------
-  const fetchLogs = async () => {
-    const { data, error } = await supabase
+    const { data: scanData } = await supabase
       .from("scans")
       .select(`
         id,
         scanned_at,
         latitude,
         longitude,
-        qr_codes (
-          qr_value,
-          name,
-          description
-        )
+        qr_codes ( name, description )
       `)
       .order("scanned_at", { ascending: false });
 
-    if (!error) setLogs(data);
+    setQrCodes(qrData || []);
+    setRiddles(riddleData || []);
+    setLogs(scanData || []);
   };
 
   useEffect(() => {
-    fetchQRCodes();
-    fetchLogs();
+    fetchAll();
   }, []);
 
+  /* ===========================
+     CREATE QR CODES
+  ============================ */
+  const generateQRCodes = async () => {
+    if (!qrName) return alert("Enter QR name");
+
+    const records = [];
+    for (let i = 0; i < qrCount; i++) {
+      records.push({
+        qr_value: crypto.randomUUID(),
+        name: qrName,
+        description: qrDescription,
+        max_scans: maxScans,
+      });
+    }
+
+    await supabase.from("qr_codes").insert(records);
+
+    setQrName("");
+    setQrDescription("");
+    fetchAll();
+  };
+
+  /* ===========================
+     RIDDLE MANAGEMENT
+  ============================ */
+  const addRiddle = async () => {
+    if (!riddleText) return alert("Enter riddle text");
+
+    await supabase.from("riddles").insert({
+      title: riddleTitle,
+      riddle: riddleText,
+    });
+
+    setRiddleTitle("");
+    setRiddleText("");
+    fetchAll();
+  };
+
+  const deleteRiddle = async (id) => {
+    await supabase.from("riddles").delete().eq("id", id);
+    fetchAll();
+  };
+
+  const assignRiddle = async (qrId, riddleId) => {
+    await supabase
+      .from("qr_codes")
+      .update({ riddle_id: riddleId })
+      .eq("id", qrId);
+
+    fetchAll();
+  };
+
   return (
-    <div style={{ marginTop: "20px" }}>
-      <h3>Admin Dashboard</h3>
+    <div style={{ padding: 20 }}>
+      <h2>Admin Dashboard</h2>
 
-      {/* ---------------- QR GENERATION ---------------- */}
-      <h4>Generate QR Codes</h4>
+      {/* ================= QR GENERATION ================= */}
+      <h3>Create QR Codes</h3>
 
-      <label>QR Name</label>
       <input
-        type="text"
-        placeholder="e.g. Library Entry"
+        placeholder="QR Name"
         value={qrName}
         onChange={(e) => setQrName(e.target.value)}
       />
 
-      <label>QR Description</label>
       <input
-        type="text"
-        placeholder="e.g. Staff Only"
+        placeholder="QR Description"
         value={qrDescription}
         onChange={(e) => setQrDescription(e.target.value)}
       />
 
-      <label>Number of QR Codes</label>
       <input
         type="number"
-        value={count}
-        min="1"
-        onChange={(e) => setCount(Number(e.target.value))}
+        placeholder="Count"
+        value={qrCount}
+        onChange={(e) => setQrCount(Number(e.target.value))}
       />
 
-      <label>Max Scans Per QR</label>
       <input
         type="number"
+        placeholder="Max Scans"
         value={maxScans}
-        min="1"
         onChange={(e) => setMaxScans(Number(e.target.value))}
       />
 
-      <button onClick={generateQRCodes}>
-        Generate QR Codes
-      </button>
+      <button onClick={generateQRCodes}>Generate QR</button>
 
       <hr />
 
-      {/* ---------------- QR DISPLAY ---------------- */}
-      <h4>Generated QR Codes</h4>
+      {/* ================= RIDDLES ================= */}
+      <h3>Add Riddle</h3>
 
-      {qrCodes.length === 0 && <p>No QR codes generated yet</p>}
+      <input
+        placeholder="Riddle Title"
+        value={riddleTitle}
+        onChange={(e) => setRiddleTitle(e.target.value)}
+      />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-          gap: "16px",
-        }}
-      >
-        {qrCodes.map((qr) => (
-          <div
-            key={qr.id}
-            style={{
-              border: "1px solid #ccc",
-              padding: "10px",
-              textAlign: "center",
-            }}
-          >
-            <QRCodeCanvas value={qr.qr_value} size={120} />
+      <textarea
+        placeholder="Riddle text"
+        value={riddleText}
+        onChange={(e) => setRiddleText(e.target.value)}
+      />
 
-            <p><strong>{qr.name}</strong></p>
-            <p style={{ fontSize: "12px", color: "#555" }}>
-              {qr.description}
-            </p>
+      <button onClick={addRiddle}>Add Riddle</button>
 
-            <p style={{ fontSize: "11px", wordBreak: "break-all" }}>
-              {qr.qr_value}
-            </p>
-
-            <p>
-              {qr.scans_done} / {qr.max_scans} scans
-            </p>
-
-            {!qr.is_active && (
-              <p style={{ color: "red", fontWeight: "bold" }}>
-                EXPIRED
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
+      <h3>Riddles</h3>
+      {riddles.map((r) => (
+        <div key={r.id} style={{ border: "1px solid #ccc", padding: 10 }}>
+          <b>{r.title}</b>
+          <p>{r.riddle}</p>
+          <button onClick={() => deleteRiddle(r.id)}>Delete</button>
+        </div>
+      ))}
 
       <hr />
 
-      {/* ---------------- SCAN LOGS ---------------- */}
-      <h4>Scan Logs</h4>
+      {/* ================= QR ↔ RIDDLE ================= */}
+      <h3>Assign Riddles to QR</h3>
 
-      {logs.length === 0 && <p>No scans yet</p>}
+      {qrCodes.map((qr) => (
+        <div key={qr.id} style={{ marginBottom: 20 }}>
+          <QRCodeCanvas value={qr.qr_value} size={100} />
+          <p><b>{qr.name}</b></p>
+          <p>{qr.description}</p>
+          <p>Assigned: {qr.riddles?.title || "None"}</p>
+
+          <select onChange={(e) => assignRiddle(qr.id, e.target.value)}>
+            <option>Select Riddle</option>
+            {riddles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+
+      <hr />
+
+      {/* ================= SCAN LOGS ================= */}
+      <h3>Scan Logs</h3>
 
       {logs.map((log) => (
-        <div
-          key={log.id}
-          style={{
-            border: "1px solid #ccc",
-            padding: "10px",
-            marginBottom: "10px",
-          }}
-        >
-          <p><strong>QR Name:</strong> {log.qr_codes?.name}</p>
-          <p><strong>Description:</strong> {log.qr_codes?.description}</p>
-          <p><strong>Time:</strong> {new Date(log.scanned_at).toLocaleString()}</p>
-          <p><strong>Latitude:</strong> {log.latitude}</p>
-          <p><strong>Longitude:</strong> {log.longitude}</p>
+        <div key={log.id} style={{ border: "1px solid #ccc", marginBottom: 10 }}>
+          <p><b>QR:</b> {log.qr_codes?.name}</p>
+          <p><b>Time:</b> {new Date(log.scanned_at).toLocaleString()}</p>
+          <p><b>Lat:</b> {log.latitude}</p>
+          <p><b>Lng:</b> {log.longitude}</p>
         </div>
       ))}
     </div>

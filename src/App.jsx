@@ -4,6 +4,8 @@ import { supabase } from "./supabase";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import ScanResult from "./pages/ScanResult";
+import RiddlePage from "./pages/RiddlePage";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -30,9 +32,22 @@ function App() {
     <BrowserRouter>
       <Routes>
         {!session ? (
+          // 🔒 Not logged in
           <Route path="*" element={<Login />} />
         ) : (
-          <Route path="*" element={<Dashboard />} />
+          <>
+            {/* Dashboard */}
+            <Route path="/" element={<Dashboard />} />
+
+            {/* After QR scan */}
+            <Route path="/scan-result" element={<ScanResult />} />
+
+            {/* Riddle page */}
+            <Route path="/riddle" element={<RiddlePage />} />
+
+            {/* Fallback */}
+            <Route path="*" element={<Dashboard />} />
+          </>
         )}
       </Routes>
     </BrowserRouter>
