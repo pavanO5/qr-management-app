@@ -14,9 +14,8 @@ function AdminDashboard() {
 
   const [riddleTitle, setRiddleTitle] = useState("");
   const [riddleText, setRiddleText] = useState("");
-  const [editingRiddleId, setEditingRiddleId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
 
-  /* ================= FETCH ALL ================= */
   const fetchAll = async () => {
     const { data: qrData } = await supabase
       .from("qr_codes")
@@ -29,13 +28,9 @@ function AdminDashboard() {
 
     const { data: scanData } = await supabase
       .from("scans")
-      .select(`
-        id,
-        scanned_at,
-        latitude,
-        longitude,
-        qr_codes ( name, description )
-      `)
+      .select(
+        "id, scanned_at, latitude, longitude, qr_codes(name, description)"
+      )
       .order("scanned_at", { ascending: false });
 
     setQrCodes(qrData || []);
@@ -47,35 +42,28 @@ function AdminDashboard() {
     fetchAll();
   }, []);
 
-  /* ================= QR ================= */
+  // ================== QR ==================
   const generateQRCodes = async () => {
-    if (!qrName) return alert("Enter QR name");
-
-    const records = [];
-    for (let i = 0; i < qrCount; i++) {
-      records.push({
-        qr_value: crypto.randomUUID(),
-        name: qrName,
-        description: qrDescription,
-        max_scans: maxScans,
-      });
-    }
+    const records = Array.from({ length: qrCount }).map(() => ({
+      qr_value: crypto.randomUUID(),
+      name: qrName,
+      description: qrDescription,
+      max_scans: maxScans,
+    }));
 
     await supabase.from("qr_codes").insert(records);
-    setQrName("");
-    setQrDescription("");
     fetchAll();
   };
 
-  /* ================= RIDDLES ================= */
+  // ================== RIDDLES ==================
   const saveRiddle = async () => {
-    if (!riddleText) return alert("Enter riddle text");
+    if (!riddleText) return alert("Enter riddle");
 
-    if (editingRiddleId) {
+    if (editingId) {
       await supabase
         .from("riddles")
         .update({ title: riddleTitle, riddle: riddleText })
-        .eq("id", editingRiddleId);
+        .eq("id", editingId);
     } else {
       await supabase.from("riddles").insert({
         title: riddleTitle,
@@ -83,16 +71,10 @@ function AdminDashboard() {
       });
     }
 
+    setEditingId(null);
     setRiddleTitle("");
     setRiddleText("");
-    setEditingRiddleId(null);
     fetchAll();
-  };
-
-  const editRiddle = (r) => {
-    setEditingRiddleId(r.id);
-    setRiddleTitle(r.title);
-    setRiddleText(r.riddle);
   };
 
   const deleteRiddle = async (id) => {
@@ -113,76 +95,50 @@ function AdminDashboard() {
     <div style={{ padding: 20 }}>
       <h2>Admin Dashboard</h2>
 
-      {/* ===== QR ===== */}
+      {/* QR */}
       <h3>Create QR</h3>
-      <input placeholder="QR Name" value={qrName} onChange={(e) => setQrName(e.target.value)} />
-      <input placeholder="Description" value={qrDescription} onChange={(e) => setQrDescription(e.target.value)} />
+      <input placeholder="QR Name" onChange={(e) => setQrName(e.target.value)} />
+      <input placeholder="Description" onChange={(e) => setQrDescription(e.target.value)} />
       <input type="number" value={qrCount} onChange={(e) => setQrCount(+e.target.value)} />
       <input type="number" value={maxScans} onChange={(e) => setMaxScans(+e.target.value)} />
-      <button onClick={generateQRCodes}>Generate QR</button>
+      <button onClick={generateQRCodes}>Generate</button>
 
       <hr />
 
-      {/* ===== RIDDLE ===== */}
-      <h3>{editingRiddleId ? "Edit Riddle" : "Add Riddle"}</h3>
-      <input
-        placeholder="Riddle Title"
-        value={riddleTitle}
-        onChange={(e) => setRiddleTitle(e.target.value)}
-      />
-      <textarea
-        placeholder="Riddle Text"
-        value={riddleText}
-        onChange={(e) => setRiddleText(e.target.value)}
-      />
+      {/* RIDDLE */}
+      <h3>{editingId ? "Edit Riddle" : "Add Riddle"}</h3>
+      <input value={riddleTitle} onChange={(e) => setRiddleTitle(e.target.value)} />
+      <textarea value={riddleText} onChange={(e) => setRiddleText(e.target.value)} />
       <button onClick={saveRiddle}>
-        {editingRiddleId ? "Update Riddle" : "Add Riddle"}
+        {editingId ? "Update" : "Add"}
       </button>
 
-      <h3>Riddles</h3>
       {riddles.map((r) => (
-        <div key={r.id} style={{ border: "1px solid #ccc", padding: 10 }}>
+        <div key={r.id}>
           <b>{r.title}</b>
-          <p>{r.riddle}</p>
-          <button onClick={() => editRiddle(r)}>Edit</button>
+          <button onClick={() => { setEditingId(r.id); setRiddleTitle(r.title); setRiddleText(r.riddle); }}>Edit</button>
           <button onClick={() => deleteRiddle(r.id)}>Delete</button>
         </div>
       ))}
 
       <hr />
 
-      {/* ===== ASSIGN ===== */}
+      {/* ASSIGN */}
       <h3>Assign Riddles</h3>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, 220px)", gap: 20 }}>
         {qrCodes.map((qr) => (
-          <div key={qr.id} style={{ border: "1px solid #ccc", padding: 10 }}>
+          <div key={qr.id}>
             <QRCodeCanvas value={qr.qr_value} size={120} />
-            <p><b>{qr.name}</b></p>
-            <p>{qr.description}</p>
+            <p>{qr.name}</p>
             <select onChange={(e) => assignRiddle(qr.id, e.target.value)}>
               <option>Select Riddle</option>
               {riddles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.title}
-                </option>
+                <option key={r.id} value={r.id}>{r.title}</option>
               ))}
             </select>
           </div>
         ))}
       </div>
-
-      <hr />
-
-      {/* ===== LOGS ===== */}
-      <h3>Scan Logs</h3>
-      {logs.map((log) => (
-        <div key={log.id} style={{ border: "1px solid #ccc", marginBottom: 10 }}>
-          <p><b>QR:</b> {log.qr_codes?.name}</p>
-          <p><b>Time:</b> {new Date(log.scanned_at).toLocaleString()}</p>
-          <p><b>Lat:</b> {log.latitude}</p>
-          <p><b>Lng:</b> {log.longitude}</p>
-        </div>
-      ))}
     </div>
   );
 }
