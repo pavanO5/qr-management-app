@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ScanResult from "./pages/ScanResult";
 import RiddlePage from "./pages/RiddlePage";
+import ScanQR from "./pages/ScanQR";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -32,20 +33,23 @@ function App() {
     <BrowserRouter>
       <Routes>
         {!session ? (
-          // 🔒 Not logged in
+          /* 🔐 NOT LOGGED IN */
           <Route path="*" element={<Login />} />
         ) : (
           <>
-            {/* Dashboard */}
+            {/* MAIN DASHBOARD */}
             <Route path="/" element={<Dashboard />} />
 
-            {/* After QR scan */}
+            {/* QR SCANNER */}
+            <Route path="/scan" element={<ScanQR />} />
+
+            {/* SCAN RESULT (optional) */}
             <Route path="/scan-result" element={<ScanResult />} />
 
-            {/* Riddle page */}
-            <Route path="/riddle" element={<RiddlePage />} />
+            {/* RIDDLE PAGE (IMPORTANT) */}
+            <Route path="/riddle/:id" element={<RiddlePage />} />
 
-            {/* Fallback */}
+            {/* FALLBACK */}
             <Route path="*" element={<Dashboard />} />
           </>
         )}

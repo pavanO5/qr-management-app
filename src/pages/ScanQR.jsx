@@ -71,14 +71,12 @@ function ScanQR({ location }) {
       longitude: location?.longitude || null,
     });
 
-    // 4️⃣ Assign riddle (MAIN LOGIC)
-    const { error: assignError } = await supabase.rpc(
-      "assign_riddle",
-      {
-        p_user_id: user.id,
-        p_qr_id: qrData.id,
-      }
-    );
+    // 4️⃣ Assign riddle + auto-expire logic
+    const { data: riddleId, error: assignError } =
+      await supabase.rpc("handle_qr_scan", {
+        p_user: user.id,
+        p_qr: qrData.id,
+      });
 
     if (assignError) {
       alert(assignError.message);
@@ -86,13 +84,13 @@ function ScanQR({ location }) {
     }
 
     // 5️⃣ Redirect to riddle page
-    navigate("/riddle");
+    navigate(`/riddle/${riddleId}`);
   };
 
   return (
     <div style={{ padding: "20px" }}>
       <h3>Scan QR Code</h3>
-      <div id="qr-reader" style={{ width: "100%" }}></div>
+      <div id="qr-reader" style={{ width: "100%" }} />
     </div>
   );
 }

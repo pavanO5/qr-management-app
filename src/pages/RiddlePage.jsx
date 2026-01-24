@@ -1,61 +1,42 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { supabase } from "../supabase";
 
 function RiddlePage() {
+  const { id } = useParams(); // riddle ID from URL
   const [riddle, setRiddle] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchRiddle = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from("riddle_assignments")
-      .select("riddles(title, riddle)")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!error && data) {
-      setRiddle(data.riddles);
-    }
-
-    setLoading(false);
-  };
-
   useEffect(() => {
-    fetchRiddle();
+    const fetchRiddle = async () => {
+      const { data, error } = await supabase
+        .from("riddles")
+        .select("title, riddle")
+        .eq("id", id)
+        .single();
 
-    // Real-time updates (if riddle changes)
-    const channel = supabase
-      .channel("riddle-updates")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "riddle_assignments",
-        },
-        () => fetchRiddle()
-      )
-      .subscribe();
+      if (!error) {
+        setRiddle(data);
+      }
 
-    return () => {
-      supabase.removeChannel(channel);
+      setLoading(false);
     };
-  }, []);
 
-  if (loading) return <p>Loading riddle...</p>;
+    fetchRiddle();
+  }, [id]);
 
-  if (!riddle)
+  if (loading) {
+    return <p style={{ padding: 20 }}>Loading riddle...</p>;
+  }
+
+  if (!riddle) {
     return (
       <div style={{ padding: 20 }}>
-        <h2>No riddle assigned</h2>
-        <p>Please scan a QR code.</p>
+        <h2>No riddle found</h2>
+        <p>Please scan a valid QR code.</p>
       </div>
     );
+  }
 
   return (
     <div

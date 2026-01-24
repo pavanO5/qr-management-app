@@ -16,7 +16,6 @@ function AdminDashboard() {
   const [riddleText, setRiddleText] = useState("");
   const [editId, setEditId] = useState(null);
 
-  // ================= LOAD DATA =================
   const fetchAll = async () => {
     const { data: qr } = await supabase
       .from("qr_codes")
@@ -41,13 +40,13 @@ function AdminDashboard() {
 
   // ================= QR =================
   const generateQR = async () => {
-    if (!qrName) return alert("QR name required");
-
     const rows = Array.from({ length: qrCount }).map(() => ({
       qr_value: crypto.randomUUID(),
       name: qrName,
       description: qrDescription,
       max_scans: maxScans,
+      scans_done: 0,
+      is_active: true,
     }));
 
     await supabase.from("qr_codes").insert(rows);
@@ -94,7 +93,7 @@ function AdminDashboard() {
     <div style={{ padding: 20 }}>
       <h2>Admin Dashboard</h2>
 
-      {/* CREATE QR */}
+      {/* QR */}
       <h3>Create QR</h3>
       <input placeholder="QR Name" onChange={(e) => setQrName(e.target.value)} />
       <input placeholder="Description" onChange={(e) => setQrDescription(e.target.value)} />
@@ -107,13 +106,12 @@ function AdminDashboard() {
       {/* RIDDLES */}
       <h3>Riddles</h3>
       <input placeholder="Title" value={riddleTitle} onChange={(e) => setRiddleTitle(e.target.value)} />
-      <textarea placeholder="Riddle text" value={riddleText} onChange={(e) => setRiddleText(e.target.value)} />
+      <textarea placeholder="Riddle" value={riddleText} onChange={(e) => setRiddleText(e.target.value)} />
       <button onClick={saveRiddle}>{editId ? "Update" : "Add"}</button>
 
       {riddles.map((r) => (
         <div key={r.id}>
           <b>{r.title}</b>
-          <p>{r.riddle}</p>
           <button onClick={() => { setEditId(r.id); setRiddleTitle(r.title); setRiddleText(r.riddle); }}>
             Edit
           </button>
@@ -124,12 +122,17 @@ function AdminDashboard() {
       <hr />
 
       {/* ASSIGN */}
-      <h3>Assign Riddle to QR</h3>
+      <h3>Assign Riddle</h3>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, 200px)", gap: 20 }}>
         {qrCodes.map((qr) => (
           <div key={qr.id}>
             <QRCodeCanvas value={qr.qr_value} size={120} />
             <p>{qr.name}</p>
+            <p>
+              {qr.scans_done}/{qr.max_scans} —
+              {qr.is_active ? " Active" : " Expired"}
+            </p>
+
             <select onChange={(e) => assignRiddle(qr.id, e.target.value)}>
               <option value="">Select Riddle</option>
               {riddles.map((r) => (
