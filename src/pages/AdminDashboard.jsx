@@ -75,10 +75,27 @@ function AdminDashboard() {
     fetchAll();
   };
 
-  const deleteRiddle = async (id) => {
-    await supabase.from("riddles").delete().eq("id", id);
-    fetchAll();
-  };
+const deleteRiddle = async (id) => {
+  const confirmDelete = window.confirm(
+    "Are you sure you want to delete this riddle?"
+  );
+
+  if (!confirmDelete) return;
+
+  const { error } = await supabase
+    .from("riddles")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    alert("Delete failed: " + error.message);
+    return;
+  }
+
+  alert("Riddle deleted successfully");
+  fetchAll();
+};
+
 
   const assignRiddle = async (qrId, riddleId) => {
     await supabase
