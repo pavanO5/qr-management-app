@@ -23,20 +23,20 @@ function AdminDashboard() {
     <div style={{ padding: 30 }}>
       <h2>Admin Dashboard</h2>
 
-      {/* NAVIGATION */}
+      {/* Navigation */}
       <div style={{ display: "flex", gap: 20, marginBottom: 30 }}>
-        <button onClick={() => navigate("/admin/qrs")}>
+        <button onClick={() => navigate("/qr-manager")}>
           QR Management
         </button>
 
-        <button onClick={() => navigate("/admin/riddles")}>
+        <button onClick={() => navigate("/riddle-manager")}>
           Riddle Management
         </button>
       </div>
 
       <hr />
 
-      {/* LOGS */}
+      {/* Logs */}
       <h3>Scan Logs</h3>
 
       {logs.length === 0 && <p>No scans yet</p>}
