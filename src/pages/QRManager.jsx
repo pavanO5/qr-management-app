@@ -70,7 +70,7 @@ function QRManager() {
   const deleteAllQR = async () => {
     if (!window.confirm("Delete ALL QR codes?")) return;
 
-    await supabase.from("qr_codes").delete().neq("id", 0);
+    await supabase.from("qr_codes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
     fetchAll();
   };
 
@@ -82,7 +82,12 @@ function QRManager() {
       .update({ riddle_id: riddleId })
       .eq("id", qrId);
 
-    fetchAll();
+    fetchAll(); // 🔥 refresh instantly
+  };
+
+  /* ================= AUTO EXPIRE LOGIC ================= */
+  const isExpired = (qr) => {
+    return qr.scans_done >= qr.max_scans;
   };
 
   return (
@@ -138,65 +143,68 @@ function QRManager() {
           gap: 20,
         }}
       >
-        {qrCodes.map((qr) => (
-          <div
-            key={qr.id}
-            style={{
-              border: "1px solid #ccc",
-              padding: 10,
-              borderRadius: 8,
-            }}
-          >
-            <QRCodeCanvas value={qr.qr_value} size={120} />
+        {qrCodes.map((qr) => {
+          const expired = isExpired(qr);
 
-            <p><b>{qr.name}</b></p>
-            <p>{qr.description}</p>
+          return (
+            <div
+              key={qr.id}
+              style={{
+                border: "1px solid #ccc",
+                padding: 10,
+                borderRadius: 8,
+              }}
+            >
+              <QRCodeCanvas value={qr.qr_value} size={120} />
 
-            <p>
-              Status:{" "}
-              <span
-                style={{
-                  color: qr.is_active ? "green" : "red",
-                  fontWeight: "bold",
-                }}
+              <p><b>{qr.name}</b></p>
+              <p>{qr.description}</p>
+
+              <p>
+                Status:
+                <span
+                  style={{
+                    color: expired ? "red" : "green",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {expired ? " EXPIRED" : " ACTIVE"}
+                </span>
+              </p>
+
+              <p>
+                Scans: {qr.scans_done}/{qr.max_scans}
+              </p>
+
+              <p>
+                Riddle:
+                <b> {qr.riddles?.title || "Not Assigned"}</b>
+              </p>
+
+              {/* Assign / Change Riddle */}
+              <select
+                value={qr.riddle_id || ""}
+                onChange={(e) => assignRiddle(qr.id, e.target.value)}
               >
-                {qr.is_active ? "ACTIVE" : "EXPIRED"}
-              </span>
-            </p>
+                <option value="">Select Riddle</option>
+                {riddles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.title}
+                  </option>
+                ))}
+              </select>
 
-            <p>
-              Scans: {qr.scans_done}/{qr.max_scans}
-            </p>
+              <br /><br />
 
-            <p>
-              Riddle:{" "}
-              <b>{qr.riddles?.title || "Not Assigned"}</b>
-            </p>
-
-            {/* ASSIGN / CHANGE */}
-            <select
-              value={qr.riddle_id || ""}
-              onChange={(e) => assignRiddle(qr.id, e.target.value)}
-            >
-              <option value="">Select Riddle</option>
-              {riddles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.title}
-                </option>
-              ))}
-            </select>
-
-            <br />
-            <br />
-
-            <button
-              style={{ background: "crimson", color: "white" }}
-              onClick={() => deleteQR(qr.id)}
-            >
-              Delete QR
-            </button>
-          </div>
-        ))}
+              <button
+                style={{ background: "crimson", color: "white" }}
+                onClick={() => deleteQR(qr.id)}
+              >
+                Delete QR
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
