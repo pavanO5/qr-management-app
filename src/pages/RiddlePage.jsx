@@ -1,37 +1,46 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
 import { supabase } from "../supabase";
 
 function RiddlePage() {
-  const { id } = useParams(); // riddle ID from URL
   const [riddle, setRiddle] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchRiddle = async () => {
-      const { data, error } = await supabase
-        .from("riddles")
-        .select("title, riddle")
-        .eq("id", id)
-        .single();
+  const fetchRiddle = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      if (!error) {
-        setRiddle(data);
-      }
-
+    if (!user) {
       setLoading(false);
-    };
+      return;
+    }
 
+    const { data, error } = await supabase
+      .from("user_riddles")
+      .select("riddles(title, riddle)")
+      .eq("user_id", user.id)
+      .single();
+
+    if (error || !data) {
+      setRiddle(null);
+    } else {
+      setRiddle(data.riddles);
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchRiddle();
-  }, [id]);
+  }, []);
 
   if (loading) {
-    return <p style={{ padding: 20 }}>Loading riddle...</p>;
+    return <p style={{ textAlign: "center" }}>Loading riddle...</p>;
   }
 
   if (!riddle) {
     return (
-      <div style={{ padding: 20 }}>
+      <div style={{ padding: 30, textAlign: "center" }}>
         <h2>No riddle found</h2>
         <p>Please scan a valid QR code.</p>
       </div>
