@@ -1,173 +1,59 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
-import { QRCodeCanvas } from "qrcode.react";
 
 function AdminDashboard() {
-  const [qrCodes, setQrCodes] = useState([]);
-  const [riddles, setRiddles] = useState([]);
+  const navigate = useNavigate();
   const [logs, setLogs] = useState([]);
 
-  const [qrName, setQrName] = useState("");
-  const [qrDescription, setQrDescription] = useState("");
-  const [qrCount, setQrCount] = useState(1);
-  const [maxScans, setMaxScans] = useState(1);
-
-  const [riddleTitle, setRiddleTitle] = useState("");
-  const [riddleText, setRiddleText] = useState("");
-  const [editId, setEditId] = useState(null);
-
-  const fetchAll = async () => {
-    const { data: qr } = await supabase
-      .from("qr_codes")
-      .select("*, riddles(title)")
-      .order("created_at", { ascending: false });
-
-    const { data: rid } = await supabase.from("riddles").select("*");
-
-    const { data: scan } = await supabase
+  const fetchLogs = async () => {
+    const { data } = await supabase
       .from("scans")
       .select("*, qr_codes(name)")
       .order("scanned_at", { ascending: false });
 
-    setQrCodes(qr || []);
-    setRiddles(rid || []);
-    setLogs(scan || []);
+    setLogs(data || []);
   };
 
   useEffect(() => {
-    fetchAll();
+    fetchLogs();
   }, []);
 
-  // ================= QR =================
-  const generateQR = async () => {
-    const rows = Array.from({ length: qrCount }).map(() => ({
-      qr_value: crypto.randomUUID(),
-      name: qrName,
-      description: qrDescription,
-      max_scans: maxScans,
-      scans_done: 0,
-      is_active: true,
-    }));
-
-    await supabase.from("qr_codes").insert(rows);
-    fetchAll();
-  };
-
-  // ================= RIDDLE =================
-  const saveRiddle = async () => {
-    if (!riddleText) return alert("Enter riddle");
-
-    if (editId) {
-      await supabase
-        .from("riddles")
-        .update({ title: riddleTitle, riddle: riddleText })
-        .eq("id", editId);
-    } else {
-      await supabase.from("riddles").insert({
-        title: riddleTitle,
-        riddle: riddleText,
-      });
-    }
-
-    setEditId(null);
-    setRiddleTitle("");
-    setRiddleText("");
-    fetchAll();
-  };
-
-const deleteRiddle = async (id) => {
-  const confirmDelete = window.confirm(
-    "Are you sure you want to delete this riddle?"
-  );
-
-  if (!confirmDelete) return;
-
-  const { error } = await supabase
-    .from("riddles")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    alert("Delete failed: " + error.message);
-    return;
-  }
-
-  alert("Riddle deleted successfully");
-  fetchAll();
-};
-
-
-  const assignRiddle = async (qrId, riddleId) => {
-    await supabase
-      .from("qr_codes")
-      .update({ riddle_id: riddleId })
-      .eq("id", qrId);
-
-    fetchAll();
-  };
-
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 30 }}>
       <h2>Admin Dashboard</h2>
 
-      {/* QR */}
-      <h3>Create QR</h3>
-      <input placeholder="QR Name" onChange={(e) => setQrName(e.target.value)} />
-      <input placeholder="Description" onChange={(e) => setQrDescription(e.target.value)} />
-      <input type="number" value={qrCount} onChange={(e) => setQrCount(+e.target.value)} />
-      <input type="number" value={maxScans} onChange={(e) => setMaxScans(+e.target.value)} />
-      <button onClick={generateQR}>Generate</button>
+      {/* NAVIGATION */}
+      <div style={{ display: "flex", gap: 20, marginBottom: 30 }}>
+        <button onClick={() => navigate("/admin/qrs")}>
+          QR Management
+        </button>
 
-      <hr />
-
-      {/* RIDDLES */}
-      <h3>Riddles</h3>
-      <input placeholder="Title" value={riddleTitle} onChange={(e) => setRiddleTitle(e.target.value)} />
-      <textarea placeholder="Riddle" value={riddleText} onChange={(e) => setRiddleText(e.target.value)} />
-      <button onClick={saveRiddle}>{editId ? "Update" : "Add"}</button>
-
-      {riddles.map((r) => (
-        <div key={r.id}>
-          <b>{r.title}</b>
-          <button onClick={() => { setEditId(r.id); setRiddleTitle(r.title); setRiddleText(r.riddle); }}>
-            Edit
-          </button>
-          <button onClick={() => deleteRiddle(r.id)}>Delete</button>
-        </div>
-      ))}
-
-      <hr />
-
-      {/* ASSIGN */}
-      <h3>Assign Riddle</h3>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, 200px)", gap: 20 }}>
-        {qrCodes.map((qr) => (
-          <div key={qr.id}>
-            <QRCodeCanvas value={qr.qr_value} size={120} />
-            <p>{qr.name}</p>
-            <p>
-              {qr.scans_done}/{qr.max_scans} —
-              {qr.is_active ? " Active" : " Expired"}
-            </p>
-
-            <select onChange={(e) => assignRiddle(qr.id, e.target.value)}>
-              <option value="">Select Riddle</option>
-              {riddles.map((r) => (
-                <option key={r.id} value={r.id}>{r.title}</option>
-              ))}
-            </select>
-          </div>
-        ))}
+        <button onClick={() => navigate("/admin/riddles")}>
+          Riddle Management
+        </button>
       </div>
 
       <hr />
 
       {/* LOGS */}
       <h3>Scan Logs</h3>
-      {logs.map((l) => (
-        <div key={l.id}>
-          <b>{l.qr_codes?.name}</b>
-          <p>{new Date(l.scanned_at).toLocaleString()}</p>
+
+      {logs.length === 0 && <p>No scans yet</p>}
+
+      {logs.map((log) => (
+        <div
+          key={log.id}
+          style={{
+            border: "1px solid #ccc",
+            padding: 10,
+            marginBottom: 10,
+          }}
+        >
+          <p><b>QR:</b> {log.qr_codes?.name}</p>
+          <p><b>Time:</b> {new Date(log.scanned_at).toLocaleString()}</p>
+          <p><b>Latitude:</b> {log.latitude}</p>
+          <p><b>Longitude:</b> {log.longitude}</p>
         </div>
       ))}
     </div>

@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { supabase } from "./supabase";
 
+/* Pages */
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import ScanResult from "./pages/ScanResult";
-import RiddlePage from "./pages/RiddlePage";
+import QRManager from "./pages/QRManager";
+import RiddleManager from "./pages/RiddleManager";
 import ScanQR from "./pages/ScanQR";
+import RiddlePage from "./pages/RiddlePage";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -32,22 +34,19 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* NOT LOGGED IN */}
         {!session ? (
-          /* 🔐 NOT LOGGED IN */
           <Route path="*" element={<Login />} />
         ) : (
           <>
-            {/* MAIN DASHBOARD */}
+            {/* ADMIN */}
             <Route path="/" element={<Dashboard />} />
+            <Route path="/qr-manager" element={<QRManager />} />
+            <Route path="/riddle-manager" element={<RiddleManager />} />
 
-            {/* QR SCANNER */}
+            {/* USER */}
             <Route path="/scan" element={<ScanQR />} />
-
-            {/* SCAN RESULT (optional) */}
-            <Route path="/scan-result" element={<ScanResult />} />
-
-            {/* RIDDLE PAGE (IMPORTANT) */}
-            <Route path="/riddle/:id" element={<RiddlePage />} />
+            <Route path="/riddle" element={<RiddlePage />} />
 
             {/* FALLBACK */}
             <Route path="*" element={<Dashboard />} />
