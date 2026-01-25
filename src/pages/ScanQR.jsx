@@ -14,7 +14,7 @@ function ScanQR({ location }) {
         qrbox: { width: 250, height: 250 },
         rememberLastUsedCamera: false,
         videoConstraints: {
-          facingMode: "environment", // back camera
+          facingMode: "environment",
         },
       },
       false
@@ -53,7 +53,7 @@ function ScanQR({ location }) {
       return;
     }
 
-    // 2️⃣ Get logged-in user
+    // 2️⃣ Get user
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -63,7 +63,7 @@ function ScanQR({ location }) {
       return;
     }
 
-    // 3️⃣ Insert scan log
+    // 3️⃣ Log scan
     await supabase.from("scans").insert({
       qr_id: qrData.id,
       user_id: user.id,
@@ -71,20 +71,22 @@ function ScanQR({ location }) {
       longitude: location?.longitude || null,
     });
 
-    // 4️⃣ Assign riddle + auto-expire logic
-    const { data: riddleId, error: assignError } =
-      await supabase.rpc("handle_qr_scan", {
+    // 4️⃣ Assign riddle
+    const { error: assignError } = await supabase.rpc(
+      "handle_qr_scan",
+      {
         p_user: user.id,
         p_qr: qrData.id,
-      });
+      }
+    );
 
     if (assignError) {
       alert(assignError.message);
       return;
     }
 
-    // 5️⃣ Redirect to riddle page
-    navigate(`/riddle/${riddleId}`);
+    // ✅ CORRECT REDIRECT
+    navigate("/riddle");
   };
 
   return (
