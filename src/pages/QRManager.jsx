@@ -3,36 +3,43 @@ import { supabase } from "../supabase";
 import { QRCodeCanvas } from "qrcode.react";
 
 function QRManager() {
-  const [qrs, setQrs] = useState([]);
+  const [qrCodes, setQrCodes] = useState([]);
   const [riddles, setRiddles] = useState([]);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [count, setCount] = useState(1);
   const [maxScans, setMaxScans] = useState(1);
+  const [count, setCount] = useState(1);
 
-  const fetchData = async () => {
-    const { data: qrData } = await supabase
+  /* ================= FETCH DATA ================= */
+
+  const fetchAll = async () => {
+    const { data: qr } = await supabase
       .from("qr_codes")
       .select("*, riddles(title)")
       .order("created_at", { ascending: false });
 
-    const { data: riddleData } = await supabase
+    const { data: rid } = await supabase
       .from("riddles")
       .select("*");
 
-    setQrs(qrData || []);
-    setRiddles(riddleData || []);
+    setQrCodes(qr || []);
+    setRiddles(rid || []);
   };
 
   useEffect(() => {
-    fetchData();
+    fetchAll();
   }, []);
 
-  const generateQR = async () => {
-    if (!name) return alert("QR name required");
+  /* ================= CREATE QR ================= */
 
-    const records = Array.from({ length: count }).map(() => ({
+  const createQR = async () => {
+    if (!name || !description) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    const rows = Array.from({ length: count }).map(() => ({
       qr_value: crypto.randomUUID(),
       name,
       description,
@@ -41,9 +48,33 @@ function QRManager() {
       is_active: true,
     }));
 
-    await supabase.from("qr_codes").insert(records);
-    fetchData();
+    await supabase.from("qr_codes").insert(rows);
+
+    setName("");
+    setDescription("");
+    setCount(1);
+    setMaxScans(1);
+
+    fetchAll();
   };
+
+  /* ================= DELETE ================= */
+
+  const deleteQR = async (id) => {
+    if (!window.confirm("Delete this QR?")) return;
+
+    await supabase.from("qr_codes").delete().eq("id", id);
+    fetchAll();
+  };
+
+  const deleteAllQR = async () => {
+    if (!window.confirm("Delete ALL QR codes?")) return;
+
+    await supabase.from("qr_codes").delete().neq("id", 0);
+    fetchAll();
+  };
+
+  /* ================= ASSIGN RIDDLE ================= */
 
   const assignRiddle = async (qrId, riddleId) => {
     await supabase
@@ -51,51 +82,119 @@ function QRManager() {
       .update({ riddle_id: riddleId })
       .eq("id", qrId);
 
-    fetchData();
+    fetchAll();
   };
 
   return (
     <div style={{ padding: 30 }}>
-      <h2>QR Management</h2>
+      <h2>QR Manager</h2>
 
+      {/* ================= CREATE ================= */}
       <h3>Create QR</h3>
-      <input placeholder="QR Name" onChange={(e) => setName(e.target.value)} />
+
       <input
-        placeholder="Description"
+        placeholder="Enter name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+
+      <input
+        placeholder="Enter description"
+        value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
+
       <input
         type="number"
-        value={count}
-        onChange={(e) => setCount(+e.target.value)}
-      />
-      <input
-        type="number"
+        placeholder="Enter scan count"
         value={maxScans}
         onChange={(e) => setMaxScans(+e.target.value)}
       />
-      <button onClick={generateQR}>Generate QR</button>
+
+      <input
+        type="number"
+        placeholder="Enter count"
+        value={count}
+        onChange={(e) => setCount(+e.target.value)}
+      />
+
+      <button onClick={createQR}>Create QR</button>
 
       <hr />
 
-      <h3>QR Codes</h3>
+      {/* ================= DELETE ALL ================= */}
+      <button
+        style={{ background: "red", color: "white", marginBottom: 20 }}
+        onClick={deleteAllQR}
+      >
+        Delete All QR Codes
+      </button>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, 220px)", gap: 20 }}>
-        {qrs.map((qr) => (
-          <div key={qr.id} style={{ border: "1px solid #ccc", padding: 10 }}>
+      {/* ================= QR LIST ================= */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: 20,
+        }}
+      >
+        {qrCodes.map((qr) => (
+          <div
+            key={qr.id}
+            style={{
+              border: "1px solid #ccc",
+              padding: 10,
+              borderRadius: 8,
+            }}
+          >
             <QRCodeCanvas value={qr.qr_value} size={120} />
-            <p><b>{qr.name}</b></p>
-            <p>{qr.scans_done}/{qr.max_scans}</p>
-            <p>{qr.is_active ? "Active" : "Expired"}</p>
 
-            <select onChange={(e) => assignRiddle(qr.id, e.target.value)}>
-              <option value="">Assign Riddle</option>
+            <p><b>{qr.name}</b></p>
+            <p>{qr.description}</p>
+
+            <p>
+              Status:{" "}
+              <span
+                style={{
+                  color: qr.is_active ? "green" : "red",
+                  fontWeight: "bold",
+                }}
+              >
+                {qr.is_active ? "ACTIVE" : "EXPIRED"}
+              </span>
+            </p>
+
+            <p>
+              Scans: {qr.scans_done}/{qr.max_scans}
+            </p>
+
+            <p>
+              Riddle:{" "}
+              <b>{qr.riddles?.title || "Not Assigned"}</b>
+            </p>
+
+            {/* ASSIGN / CHANGE */}
+            <select
+              value={qr.riddle_id || ""}
+              onChange={(e) => assignRiddle(qr.id, e.target.value)}
+            >
+              <option value="">Select Riddle</option>
               {riddles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.title}
                 </option>
               ))}
             </select>
+
+            <br />
+            <br />
+
+            <button
+              style={{ background: "crimson", color: "white" }}
+              onClick={() => deleteQR(qr.id)}
+            >
+              Delete QR
+            </button>
           </div>
         ))}
       </div>
