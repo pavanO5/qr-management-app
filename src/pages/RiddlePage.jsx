@@ -32,6 +32,26 @@ function RiddlePage() {
 
   useEffect(() => {
     fetchRiddle();
+
+    // ✅ REALTIME UPDATE WHEN RIDDLE CHANGES
+    const channel = supabase
+      .channel("riddle-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_riddles",
+        },
+        () => {
+          fetchRiddle();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {
