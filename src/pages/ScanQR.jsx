@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { supabase } from "../supabase";
 import { useNavigate } from "react-router-dom";
 
 function ScanQR({ location }) {
   const navigate = useNavigate();
+  const hasScanned = useRef(false); // ✅ prevents double scan
 
   useEffect(() => {
     const scanner = new Html5QrcodeScanner(
@@ -22,6 +23,9 @@ function ScanQR({ location }) {
 
     scanner.render(
       async (decodedText) => {
+        if (hasScanned.current) return; // 🚫 block double scan
+        hasScanned.current = true;
+
         await scanner.clear();
         await handleScan(decodedText);
       },
@@ -64,7 +68,7 @@ function ScanQR({ location }) {
         return;
       }
 
-      /* 3️⃣ Save scan */
+      /* 3️⃣ Save scan log (ONLY ONCE) */
       await supabase.from("scans").insert({
         qr_id: qrData.id,
         user_id: user.id,
@@ -72,14 +76,11 @@ function ScanQR({ location }) {
         longitude: location?.longitude || null,
       });
 
-      /* 4️⃣ Call backend logic */
-      const { data: riddleId, error } = await supabase.rpc(
-        "handle_qr_scan",
-        {
-          p_user: user.id,
-          p_qr: qrData.id,
-        }
-      );
+      /* 4️⃣ Game logic */
+      const { error } = await supabase.rpc("handle_qr_scan", {
+        p_user: user.id,
+        p_qr: qrData.id,
+      });
 
       if (error) {
         console.error(error);
@@ -89,7 +90,6 @@ function ScanQR({ location }) {
 
       /* 5️⃣ Redirect */
       navigate("/riddle");
-
     } catch (err) {
       console.error("Scan error:", err);
       alert("Something went wrong while scanning.");
