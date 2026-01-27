@@ -37,17 +37,33 @@ function ScanQR() {
 
   /* ❌ Location block */
   if (!location || locationError) {
-    return (
-      <div style={{ padding: 30, textAlign: "center" }}>
-        <h3>Location Required</h3>
-        <button onClick={getLocation}>Retry</button>
-        <br />
-        <button onClick={logout} style={{ marginTop: 10 }}>
-          Logout
-        </button>
-      </div>
-    );
-  }
+  return (
+    <div style={{ padding: 30, textAlign: "center" }}>
+      <h3>📍 Location Permission Required</h3>
+
+      <p>
+        Please allow location access in your browser settings.
+      </p>
+
+      <p style={{ fontSize: 14, color: "#666" }}>
+        Chrome → Lock icon → Location → Allow → Refresh
+      </p>
+
+      <button onClick={getLocation} style={{ margin: 10 }}>
+        Retry
+      </button>
+
+      <button
+        onClick={() => {
+          localStorage.removeItem("team_id");
+          window.location.href = "/";
+        }}
+      >
+        Logout
+      </button>
+    </div>
+  );
+}
 
   /* 📷 QR SCANNER */
   useEffect(() => {
