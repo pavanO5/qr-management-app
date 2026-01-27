@@ -10,8 +10,8 @@ function ScanQR() {
   const [location, setLocation] = useState(null);
   const [locationError, setLocationError] = useState(false);
 
-  /* 📍 LOCATION */
-  const getLocation = () => {
+  /* ================= LOCATION ================= */
+  useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLocation({
@@ -20,98 +20,76 @@ function ScanQR() {
         });
         setLocationError(false);
       },
-      () => setLocationError(true),
+      () => {
+        setLocationError(true);
+      },
       { enableHighAccuracy: true }
     );
-  };
-
-  useEffect(() => {
-    getLocation();
   }, []);
 
-  /* 🚪 LOGOUT */
-  const logout = () => {
-    localStorage.removeItem("team_id");
-    navigate("/");
-  };
-
-  /* ❌ Location block */
-  if (!location || locationError) {
-  return (
-    <div style={{ padding: 30, textAlign: "center" }}>
-      <h3>📍 Location Permission Required</h3>
-
-      <p>
-        Please allow location access in your browser settings.
-      </p>
-
-      <p style={{ fontSize: 14, color: "#666" }}>
-        Chrome → Lock icon → Location → Allow → Refresh
-      </p>
-
-      <button onClick={getLocation} style={{ margin: 10 }}>
-        Retry
-      </button>
-
-      <button
-        onClick={() => {
-          localStorage.removeItem("team_id");
-          window.location.href = "/";
-        }}
-      >
-        Logout
-      </button>
-    </div>
-  );
-}
-
-  /* 📷 QR SCANNER */
+  /* ================= QR SCANNER ================= */
   useEffect(() => {
+    if (!location) return;
+
     const scanner = new Html5QrcodeScanner(
       "qr-reader",
-      { fps: 10, qrbox: 250 },
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+      },
       false
     );
 
     scanner.render(
-      async (text) => {
+      async (decodedText) => {
         if (hasScanned.current) return;
         hasScanned.current = true;
 
         await scanner.clear();
-        handleScan(text);
+        await handleScan(decodedText);
       },
       () => {}
     );
 
-    return () => scanner.clear();
+    return () => {
+      scanner.clear().catch(() => {});
+    };
   }, [location]);
 
-  /* 🧠 MAIN LOGIC */
+  /* ================= LOGOUT ================= */
+  const logout = () => {
+    localStorage.removeItem("team_id");
+    window.location.href = "/";
+  };
+
+  /* ================= HANDLE SCAN ================= */
   const handleScan = async (rawQrValue) => {
     try {
-      const qrValue = rawQrValue.trim();
       const teamId = localStorage.getItem("team_id");
-
       if (!teamId) {
         alert("Session expired");
         navigate("/");
         return;
       }
 
-      /* 1️⃣ Fetch QR */
-      const { data: qrData } = await supabase
+      const qrValue = rawQrValue.trim();
+
+      const { data: qrData, error } = await supabase
         .from("qr_codes")
         .select("*")
         .eq("qr_value", qrValue)
         .single();
 
-      if (!qrData || !qrData.is_active) {
-        alert("Invalid or expired QR");
+      if (!qrData || error) {
+        alert("Invalid QR");
         return;
       }
 
-      /* 2️⃣ Log Scan */
+      if (!qrData.is_active) {
+        alert("QR expired");
+        return;
+      }
+
       await supabase.from("scans").insert({
         qr_id: qrData.id,
         user_id: teamId,
@@ -119,32 +97,16 @@ function ScanQR() {
         longitude: location.longitude,
       });
 
-      /* 3️⃣ Assign Riddle */
-      const { error } = await supabase.rpc("handle_qr_scan", {
+      const { error: rpcError } = await supabase.rpc("handle_qr_scan", {
         p_user: teamId,
         p_qr: qrData.id,
       });
 
-      if (error) {
-        alert(error.message);
+      if (rpcError) {
+        alert(rpcError.message);
         return;
       }
 
-      /* 4️⃣ VERIFY RIDDLE EXISTS */
-      const { data: riddle } = await supabase
-        .from("user_riddles")
-        .select("*")
-        .eq("user_id", teamId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!riddle) {
-        alert("No riddle assigned. Try again.");
-        return;
-      }
-
-      /* ✅ SUCCESS */
       navigate("/riddle");
     } catch (err) {
       console.error(err);
@@ -152,8 +114,34 @@ function ScanQR() {
     }
   };
 
+  /* ================= UI ================= */
+
+  if (locationError) {
+    return (
+      <div style={{ padding: 30, textAlign: "center" }}>
+        <h3>📍 Location Required</h3>
+        <p>Please enable location access</p>
+
+        <button onClick={() => window.location.reload()}>
+          Retry
+        </button>
+
+        <button
+          onClick={logout}
+          style={{ background: "crimson", color: "white", marginTop: 10 }}
+        >
+          Logout
+        </button>
+      </div>
+    );
+  }
+
+  if (!location) {
+    return <p style={{ textAlign: "center" }}>Getting location...</p>;
+  }
+
   return (
-    <div style={{ padding: "20px" }}>
+    <div style={{ padding: 20 }}>
       <h3>Scan QR Code</h3>
       <div id="qr-reader" style={{ width: "100%" }} />
 
