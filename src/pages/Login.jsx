@@ -1,107 +1,133 @@
-import { useEffect, useRef } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { useState } from "react";
 import { supabase } from "../supabase";
 import { useNavigate } from "react-router-dom";
 
-function ScanQR({ location }) {
+function Login() {
   const navigate = useNavigate();
-  const hasScanned = useRef(false); // ✅ prevents double scan
 
-  useEffect(() => {
-    const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        rememberLastUsedCamera: false,
-        videoConstraints: {
-          facingMode: "environment",
-        },
-      },
-      false
-    );
+  const [mode, setMode] = useState("admin"); // admin | team
+  const [email, setEmail] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-    scanner.render(
-      async (decodedText) => {
-        if (hasScanned.current) return; // 🚫 block double scan
-        hasScanned.current = true;
+  /* ================= ADMIN LOGIN ================= */
+  const handleAdminLogin = async () => {
+    if (!email || !password) {
+      alert("Enter email and password");
+      return;
+    }
 
-        await scanner.clear();
-        await handleScan(decodedText);
-      },
-      () => {}
-    );
+    setLoading(true);
 
-    return () => {
-      scanner.clear().catch(() => {});
-    };
-  }, []);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password.trim(),
+    });
 
-  const handleScan = async (rawQrValue) => {
-    try {
-      const qrValue = rawQrValue.trim();
+    setLoading(false);
 
-      /* 1️⃣ Fetch QR */
-      const { data: qrData, error: qrError } = await supabase
-        .from("qr_codes")
-        .select("*")
-        .eq("qr_value", qrValue)
-        .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
-      if (qrError || !qrData) {
-        alert("Invalid QR Code");
-        return;
-      }
-
-      if (!qrData.is_active) {
-        alert("QR Code expired");
-        return;
-      }
-
-      /* 2️⃣ Get user */
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        alert("User not logged in");
-        return;
-      }
-
-      /* 3️⃣ Save scan log (ONLY ONCE) */
-      await supabase.from("scans").insert({
-        qr_id: qrData.id,
-        user_id: user.id,
-        latitude: location?.latitude || null,
-        longitude: location?.longitude || null,
-      });
-
-      /* 4️⃣ Game logic */
-      const { error } = await supabase.rpc("handle_qr_scan", {
-        p_user: user.id,
-        p_qr: qrData.id,
-      });
-
-      if (error) {
-        console.error(error);
-        alert(error.message);
-        return;
-      }
-
-      /* 5️⃣ Redirect */
-      navigate("/riddle");
-    } catch (err) {
-      console.error("Scan error:", err);
-      alert("Something went wrong while scanning.");
+    if (data?.session) {
+      navigate("/"); // Admin dashboard
     }
   };
 
+  /* ================= TEAM LOGIN ================= */
+  const handleTeamLogin = async () => {
+    if (!teamId || !password) {
+      alert("Enter Team ID and Password");
+      return;
+    }
+
+    setLoading(true);
+
+    const deviceId = navigator.userAgent;
+
+    const { data, error } = await supabase.rpc("team_login", {
+      p_team_code: teamId.trim(),
+      p_password: password.trim(),
+      p_device_id: deviceId,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    // ✅ Save session
+    localStorage.setItem("team_id", data);
+
+    // ✅ Redirect to QR scanner
+    navigate("/scan");
+  };
+
   return (
-    <div style={{ padding: "20px" }}>
-      <h3>Scan QR Code</h3>
-      <div id="qr-reader" style={{ width: "100%" }} />
+    <div style={{ padding: 30, maxWidth: 400, margin: "auto" }}>
+      <h2>{mode === "admin" ? "Admin Login" : "Team Login"}</h2>
+
+      {/* MODE SWITCH */}
+      <div style={{ marginBottom: 20 }}>
+        <button onClick={() => setMode("admin")}>Admin</button>
+        <button onClick={() => setMode("team")}>Team</button>
+      </div>
+
+      {/* ADMIN LOGIN */}
+      {mode === "admin" && (
+        <>
+          <input
+            type="email"
+            placeholder="Admin Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ width: "100%", marginBottom: 10 }}
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ width: "100%", marginBottom: 10 }}
+          />
+
+          <button onClick={handleAdminLogin} disabled={loading}>
+            Login as Admin
+          </button>
+        </>
+      )}
+
+      {/* TEAM LOGIN */}
+      {mode === "team" && (
+        <>
+          <input
+            placeholder="Team ID"
+            value={teamId}
+            onChange={(e) => setTeamId(e.target.value)}
+            style={{ width: "100%", marginBottom: 10 }}
+          />
+
+          <input
+            type="password"
+            placeholder="Team Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ width: "100%", marginBottom: 10 }}
+          />
+
+          <button onClick={handleTeamLogin} disabled={loading}>
+            Login as Team
+          </button>
+        </>
+      )}
     </div>
   );
 }
 
-export default ScanQR;
+export default Login;
