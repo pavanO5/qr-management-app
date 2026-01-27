@@ -15,26 +15,40 @@ function TeamManager() {
     fetchTeams();
   }, []);
 
-  // ✅ Create team
+  // ✅ Create team (FIXED)
   const createTeam = async () => {
     if (!code || !password) {
       alert("Enter team ID and password");
       return;
     }
 
-    const { error } = await supabase.from("teams").insert({
-      team_code: code,
-      password,
-    });
+    try {
+      console.log("Creating team:");
+      console.log("Team:", code.trim());
+      console.log("Password:", password.trim());
 
-    if (error) {
-      alert(error.message);
-      return;
+      const { error } = await supabase
+        .from("teams")
+        .insert({
+          team_code: code.trim(),
+          password: password.trim(),
+        });
+
+      if (error) {
+        console.error("Insert error:", error);
+        alert(error.message);
+        return;
+      }
+
+      alert("Team created successfully!");
+
+      setCode("");
+      setPassword("");
+      fetchTeams();
+    } catch (err) {
+      console.error("Create team failed:", err);
+      alert("Failed to create team");
     }
-
-    setCode("");
-    setPassword("");
-    fetchTeams();
   };
 
   // ❌ Delete team
@@ -69,11 +83,13 @@ function TeamManager() {
           value={code}
           onChange={(e) => setCode(e.target.value)}
         />
+
         <input
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+
         <button onClick={createTeam}>Create Team</button>
       </div>
 
