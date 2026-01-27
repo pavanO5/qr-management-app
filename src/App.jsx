@@ -43,6 +43,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/qr-manager" element={<QRManager />} />
             <Route path="/riddle-manager" element={<RiddleManager />} />
+            <Route path="/admin/teams" element={<TeamManager />} />
 
             {/* USER */}
             <Route path="/scan" element={<ScanQR />} />

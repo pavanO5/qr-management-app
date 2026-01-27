@@ -3,71 +3,73 @@ import { supabase } from "../supabase";
 import { useNavigate } from "react-router-dom";
 
 function Login() {
+  const [isTeam, setIsTeam] = useState(false);
   const [email, setEmail] = useState("");
+  const [teamId, setTeamId] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signInWithPassword({
+  const loginAdmin = async () => {
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    if (data?.session) {
-      navigate("/");
-    }
+    if (error) return alert(error.message);
+    navigate("/");
   };
 
-  const handleSignup = async () => {
-    setLoading(true);
+  const loginTeam = async () => {
+    const deviceId = navigator.userAgent;
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
+    const { data, error } = await supabase.rpc("team_login", {
+      p_team_code: teamId,
+      p_password: password,
+      p_device_id: deviceId,
     });
 
-    setLoading(false);
+    if (error) return alert(error.message);
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("Signup successful. Now login.");
+    localStorage.setItem("team_id", data);
+    navigate("/scan");
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h3>Login</h3>
+    <div style={{ padding: 30 }}>
+      <h2>{isTeam ? "Team Login" : "Admin Login"}</h2>
 
-      <input
-        type="email"
-        placeholder="Email"
-        onChange={(e) => setEmail(e.target.value)}
-      />
+      {isTeam ? (
+        <>
+          <input
+            placeholder="Team ID"
+            onChange={(e) => setTeamId(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button onClick={loginTeam}>Login as Team</button>
+        </>
+      ) : (
+        <>
+          <input
+            placeholder="Admin Email"
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button onClick={loginAdmin}>Login as Admin</button>
+        </>
+      )}
 
-      <input
-        type="password"
-        placeholder="Password"
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      <hr />
 
-      <button onClick={handleLogin} disabled={loading}>
-        Login
-      </button>
-
-      <button onClick={handleSignup} disabled={loading}>
-        Sign Up
+      <button onClick={() => setIsTeam(!isTeam)}>
+        Switch to {isTeam ? "Admin" : "Team"} Login
       </button>
     </div>
   );

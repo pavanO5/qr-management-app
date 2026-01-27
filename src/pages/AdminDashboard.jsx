@@ -32,6 +32,10 @@ function AdminDashboard() {
         <button onClick={() => navigate("/riddle-manager")}>
           Riddle Management
         </button>
+
+        <button onClick={() => navigate("/admin/teams")}>
+         Team Management
+        </button>
       </div>
 
       <hr />
