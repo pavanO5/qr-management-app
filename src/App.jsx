@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { supabase } from "./supabase";
 
 /* Pages */
@@ -13,59 +13,51 @@ import TeamManager from "./pages/TeamManager";
 
 function App() {
   const [session, setSession] = useState(null);
-  const teamId = localStorage.getItem("team_id");
+  const [teamId, setTeamId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Admin session
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_, session) => setSession(session)
-    );
+    // Team login
+    const team = localStorage.getItem("team_id");
+    if (team) setTeamId(team);
 
-    return () => listener.subscription.unsubscribe();
+    setLoading(false);
   }, []);
+
+  if (loading) return <p>Loading...</p>;
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* LOGIN */}
+        {/* NOT LOGGED IN */}
         {!session && !teamId && (
           <Route path="*" element={<Login />} />
         )}
 
-        {/* ADMIN */}
+        {/* ADMIN ROUTES */}
         {session && (
           <>
             <Route path="/" element={<Dashboard />} />
             <Route path="/qr-manager" element={<QRManager />} />
             <Route path="/riddle-manager" element={<RiddleManager />} />
             <Route path="/admin/teams" element={<TeamManager />} />
+            <Route path="*" element={<Dashboard />} />
           </>
         )}
 
-        {/* TEAM */}
-        {teamId && (
+        {/* TEAM ROUTES */}
+        {teamId && !session && (
           <>
             <Route path="/scan" element={<ScanQR />} />
             <Route path="/riddle" element={<RiddlePage />} />
+            <Route path="*" element={<ScanQR />} />
           </>
         )}
-
-        {/* FALLBACK */}
-        <Route
-          path="*"
-          element={
-            session ? (
-              <Navigate to="/" />
-            ) : teamId ? (
-              <Navigate to="/scan" />
-            ) : (
-              <Navigate to="/" />
-            )
-          }
-        />
       </Routes>
     </BrowserRouter>
   );

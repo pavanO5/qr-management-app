@@ -8,9 +8,8 @@ function ScanQR() {
   const hasScanned = useRef(false);
 
   const [location, setLocation] = useState(null);
-  const [locationError, setLocationError] = useState(false);
+  const [error, setError] = useState(false);
 
-  /* ================= LOCATION ================= */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -18,75 +17,61 @@ function ScanQR() {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
         });
-        setLocationError(false);
       },
-      () => {
-        setLocationError(true);
-      },
+      () => setError(true),
       { enableHighAccuracy: true }
     );
   }, []);
 
-  /* ================= QR SCANNER ================= */
-  useEffect(() => {
-    if (!location) return;
-
-    const scanner = new Html5QrcodeScanner(
-      "qr-reader",
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-      },
-      false
-    );
-
-    scanner.render(
-      async (decodedText) => {
-        if (hasScanned.current) return;
-        hasScanned.current = true;
-
-        await scanner.clear();
-        await handleScan(decodedText);
-      },
-      () => {}
-    );
-
-    return () => {
-      scanner.clear().catch(() => {});
-    };
-  }, [location]);
-
-  /* ================= LOGOUT ================= */
   const logout = () => {
     localStorage.removeItem("team_id");
     window.location.href = "/";
   };
 
-  /* ================= HANDLE SCAN ================= */
-  const handleScan = async (rawQrValue) => {
+  if (!location || error) {
+    return (
+      <div style={{ padding: 30 }}>
+        <h3>Location Required</h3>
+        <button onClick={() => window.location.reload()}>Retry</button>
+        <button onClick={logout}>Logout</button>
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    const scanner = new Html5QrcodeScanner(
+      "qr-reader",
+      { fps: 10, qrbox: 250 },
+      false
+    );
+
+    scanner.render(async (text) => {
+      if (hasScanned.current) return;
+      hasScanned.current = true;
+      await scanner.clear();
+      handleScan(text);
+    });
+
+    return () => scanner.clear().catch(() => {});
+  }, [location]);
+
+  const handleScan = async (qr) => {
     try {
       const teamId = localStorage.getItem("team_id");
       if (!teamId) {
         alert("Session expired");
-        navigate("/");
+        logout();
         return;
       }
 
-      const qrValue = rawQrValue.trim();
-
-      const { data: qrData, error } = await supabase
+      const { data: qrData } = await supabase
         .from("qr_codes")
         .select("*")
-        .eq("qr_value", qrValue)
+        .eq("qr_value", qr)
         .single();
 
-      if (!qrData || error) {
+      if (!qrData || !qrData.is_active) {
         alert("Invalid QR");
-        return;
-      }
-
-      if (!qrData.is_active) {
-        alert("QR expired");
         return;
       }
 
@@ -97,66 +82,27 @@ function ScanQR() {
         longitude: location.longitude,
       });
 
-      const { error: rpcError } = await supabase.rpc("handle_qr_scan", {
+      const { error } = await supabase.rpc("handle_qr_scan", {
         p_user: teamId,
         p_qr: qrData.id,
       });
 
-      if (rpcError) {
-        alert(rpcError.message);
+      if (error) {
+        alert(error.message);
         return;
       }
 
       navigate("/riddle");
     } catch (err) {
-      console.error(err);
       alert("Scan failed");
     }
   };
 
-  /* ================= UI ================= */
-
-  if (locationError) {
-    return (
-      <div style={{ padding: 30, textAlign: "center" }}>
-        <h3>📍 Location Required</h3>
-        <p>Please enable location access</p>
-
-        <button onClick={() => window.location.reload()}>
-          Retry
-        </button>
-
-        <button
-          onClick={logout}
-          style={{ background: "crimson", color: "white", marginTop: 10 }}
-        >
-          Logout
-        </button>
-      </div>
-    );
-  }
-
-  if (!location) {
-    return <p style={{ textAlign: "center" }}>Getting location...</p>;
-  }
-
   return (
     <div style={{ padding: 20 }}>
-      <h3>Scan QR Code</h3>
-      <div id="qr-reader" style={{ width: "100%" }} />
-
-      <button
-        onClick={logout}
-        style={{
-          marginTop: 20,
-          background: "crimson",
-          color: "white",
-          padding: "10px",
-          border: "none",
-        }}
-      >
-        Logout
-      </button>
+      <h3>Scan QR</h3>
+      <div id="qr-reader" />
+      <button onClick={logout}>Logout</button>
     </div>
   );
 }

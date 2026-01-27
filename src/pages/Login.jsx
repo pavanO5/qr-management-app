@@ -38,36 +38,27 @@ function Login() {
   };
 
   /* ================= TEAM LOGIN ================= */
-  const handleTeamLogin = async () => {
-    if (!teamId || !password) {
-      alert("Enter Team ID and Password");
-      return;
-    }
+const handleTeamLogin = async () => {
+  setLoading(true);
 
-    setLoading(true);
+  const { data, error } = await supabase.rpc("team_login", {
+    p_team_code: teamId,
+    p_password: password,
+    p_device_id: navigator.userAgent,
+  });
 
-    const deviceId = navigator.userAgent;
+  setLoading(false);
 
-    const { data, error } = await supabase.rpc("team_login", {
-      p_team_code: teamId.trim(),
-      p_password: password.trim(),
-      p_device_id: deviceId,
-    });
+  if (error) {
+    alert(error.message);
+    return;
+  }
 
-    setLoading(false);
+  localStorage.setItem("team_id", data);
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    // ✅ Save session
-    localStorage.setItem("team_id", data);
-
-    // ✅ Redirect to QR scanner
-    navigate("/scan");
-
-  };
+  // ✅ FORCE reload so App.jsx detects team
+  window.location.href = "/scan";
+};
 
   return (
     <div style={{ padding: 30, maxWidth: 400, margin: "auto" }}>
