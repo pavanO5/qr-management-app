@@ -8,8 +8,9 @@ function ScanQR() {
   const hasScanned = useRef(false);
 
   const [location, setLocation] = useState(null);
-  const [error, setError] = useState(false);
+  const [locationError, setLocationError] = useState(false);
 
+  /* ✅ GET LOCATION */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -18,44 +19,40 @@ function ScanQR() {
           longitude: pos.coords.longitude,
         });
       },
-      () => setError(true),
+      () => setLocationError(true),
       { enableHighAccuracy: true }
     );
   }, []);
 
-  const logout = () => {
-    localStorage.removeItem("team_id");
-    window.location.href = "/";
-  };
-
-  if (!location || error) {
-    return (
-      <div style={{ padding: 30 }}>
-        <h3>Location Required</h3>
-        <button onClick={() => window.location.reload()}>Retry</button>
-        <button onClick={logout}>Logout</button>
-      </div>
-    );
-  }
-
+  /* ✅ QR SCANNER (always runs, never conditional) */
   useEffect(() => {
+    if (!location) return;
+
     const scanner = new Html5QrcodeScanner(
       "qr-reader",
       { fps: 10, qrbox: 250 },
       false
     );
 
-    scanner.render(async (text) => {
+    scanner.render(async (decodedText) => {
       if (hasScanned.current) return;
       hasScanned.current = true;
+
       await scanner.clear();
-      handleScan(text);
+      handleScan(decodedText);
     });
 
-    return () => scanner.clear().catch(() => {});
+    return () => {
+      scanner.clear().catch(() => {});
+    };
   }, [location]);
 
-  const handleScan = async (qr) => {
+  const logout = () => {
+    localStorage.removeItem("team_id");
+    window.location.href = "/";
+  };
+
+  const handleScan = async (rawQrValue) => {
     try {
       const teamId = localStorage.getItem("team_id");
       if (!teamId) {
@@ -67,11 +64,11 @@ function ScanQR() {
       const { data: qrData } = await supabase
         .from("qr_codes")
         .select("*")
-        .eq("qr_value", qr)
+        .eq("qr_value", rawQrValue.trim())
         .single();
 
       if (!qrData || !qrData.is_active) {
-        alert("Invalid QR");
+        alert("Invalid or expired QR");
         return;
       }
 
@@ -94,15 +91,33 @@ function ScanQR() {
 
       navigate("/riddle");
     } catch (err) {
+      console.error(err);
       alert("Scan failed");
     }
   };
 
+  /* ✅ UI (NO HOOKS BELOW THIS) */
+  if (locationError) {
+    return (
+      <div style={{ padding: 30 }}>
+        <h3>Location permission required</h3>
+        <button onClick={() => window.location.reload()}>Retry</button>
+        <button onClick={logout}>Logout</button>
+      </div>
+    );
+  }
+
+  if (!location) {
+    return <p style={{ textAlign: "center" }}>Getting location...</p>;
+  }
+
   return (
     <div style={{ padding: 20 }}>
-      <h3>Scan QR</h3>
+      <h3>Scan QR Code</h3>
       <div id="qr-reader" />
-      <button onClick={logout}>Logout</button>
+      <button onClick={logout} style={{ marginTop: 20 }}>
+        Logout
+      </button>
     </div>
   );
 }
