@@ -65,7 +65,7 @@ function Login() {
     localStorage.setItem("team_id", data);
 
     // ✅ Redirect to QR scanner
-    navigate("/scan", { replace: true });
+    navigate("/scan");
 
   };
 

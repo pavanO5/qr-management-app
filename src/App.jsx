@@ -13,36 +13,29 @@ import TeamManager from "./pages/TeamManager";
 
 function App() {
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const teamId = localStorage.getItem("team_id");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      setLoading(false);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_, session) => setSession(session)
+    );
 
-    return () => subscription.unsubscribe();
+    return () => listener.subscription.unsubscribe();
   }, []);
-
-  if (loading) return <p>Loading...</p>;
-
-  const teamId = localStorage.getItem("team_id");
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* =================== LOGIN =================== */}
+        {/* LOGIN */}
         {!session && !teamId && (
           <Route path="*" element={<Login />} />
         )}
 
-        {/* =================== ADMIN =================== */}
+        {/* ADMIN */}
         {session && (
           <>
             <Route path="/" element={<Dashboard />} />
@@ -52,7 +45,7 @@ function App() {
           </>
         )}
 
-        {/* =================== TEAM =================== */}
+        {/* TEAM */}
         {teamId && (
           <>
             <Route path="/scan" element={<ScanQR />} />
@@ -60,7 +53,7 @@ function App() {
           </>
         )}
 
-        {/* =================== FALLBACK =================== */}
+        {/* FALLBACK */}
         <Route
           path="*"
           element={
@@ -69,7 +62,7 @@ function App() {
             ) : teamId ? (
               <Navigate to="/scan" />
             ) : (
-              <Navigate to="/login" />
+              <Navigate to="/" />
             )
           }
         />
