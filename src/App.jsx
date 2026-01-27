@@ -33,31 +33,31 @@ function App() {
 
   if (loading) return <p>Loading...</p>;
 
-  return (
-    <BrowserRouter>
-      <Routes>
-        {/* NOT LOGGED IN */}
-        {!session ? (
-          <Route path="*" element={<Login />} />
-        ) : (
-          <>
-            {/* ADMIN */}
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/qr-manager" element={<QRManager />} />
-            <Route path="/riddle-manager" element={<RiddleManager />} />
-            <Route path="/admin/teams" element={<TeamManager />} />
+return (
+  <BrowserRouter>
+    <Routes>
+      {/* If admin OR team logged in */}
+      {session || localStorage.getItem("team_id") ? (
+        <>
+          {/* ADMIN ROUTES */}
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/qr-manager" element={<QRManager />} />
+          <Route path="/riddle-manager" element={<RiddleManager />} />
+          <Route path="/admin/teams" element={<TeamManager />} />
 
-            {/* USER */}
-            <Route path="/scan" element={<ScanQR />} />
-            <Route path="/riddle" element={<RiddlePage />} />
+          {/* TEAM ROUTES */}
+          <Route path="/scan" element={<ScanQR />} />
+          <Route path="/riddle" element={<RiddlePage />} />
 
-            {/* FALLBACK */}
-            <Route path="*" element={<Dashboard />} />
-          </>
-        )}
-      </Routes>
-    </BrowserRouter>
-  );
+          {/* FALLBACK */}
+          <Route path="*" element={<Dashboard />} />
+        </>
+      ) : (
+        <Route path="*" element={<Login />} />
+      )}
+    </Routes>
+  </BrowserRouter>
+);
 }
 
 export default App;
