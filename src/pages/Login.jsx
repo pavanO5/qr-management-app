@@ -97,7 +97,7 @@ function Login() {
             style={{ width: "100%", marginBottom: 10 }}
           />
 
-          <button onClick={handleAdminLogin} disabled={loading}>
+          <button type="button" onClick={handleAdminLogin} disabled={loading}>
             Login as Admin
           </button>
         </>
@@ -121,7 +121,7 @@ function Login() {
             style={{ width: "100%", marginBottom: 10 }}
           />
 
-          <button onClick={handleTeamLogin} disabled={loading}>
+         <button type="button" onClick={handleTeamLogin} disabled={loading}>
             Login as Team
           </button>
         </>
