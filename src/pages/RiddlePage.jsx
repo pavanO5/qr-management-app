@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
+import { useNavigate } from "react-router-dom";
 
 function RiddlePage() {
   const [riddle, setRiddle] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const fetchRiddle = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const teamId = localStorage.getItem("team_id");
 
-    if (!user) {
+    if (!teamId) {
       setLoading(false);
       return;
     }
@@ -18,7 +18,7 @@ function RiddlePage() {
     const { data, error } = await supabase
       .from("user_riddles")
       .select("riddles(title, riddle)")
-      .eq("user_id", user.id)
+      .eq("user_id", teamId)
       .single();
 
     if (error || !data) {
@@ -54,6 +54,12 @@ function RiddlePage() {
     };
   }, []);
 
+  /* ✅ LOGOUT */
+  const logout = () => {
+    localStorage.removeItem("team_id");
+    navigate("/");
+  };
+
   if (loading) {
     return <p style={{ textAlign: "center" }}>Loading riddle...</p>;
   }
@@ -63,6 +69,27 @@ function RiddlePage() {
       <div style={{ padding: 30, textAlign: "center" }}>
         <h2>No riddle found</h2>
         <p>Please scan a valid QR code.</p>
+
+        <button
+          onClick={() => navigate("/scan")}
+          style={{ marginTop: 15 }}
+        >
+          Scan Again
+        </button>
+
+        <br /><br />
+
+        <button
+          onClick={logout}
+          style={{
+            background: "crimson",
+            color: "white",
+            padding: "10px",
+            border: "none",
+          }}
+        >
+          Logout
+        </button>
       </div>
     );
   }
@@ -89,6 +116,16 @@ function RiddlePage() {
       >
         <p style={{ fontSize: "18px" }}>{riddle.riddle}</p>
       </div>
+
+      <button
+        onClick={() => navigate("/scan")}
+        style={{
+          marginTop: 20,
+          padding: "10px 16px",
+        }}
+      >
+        Scan Next QR
+      </button>
     </div>
   );
 }
