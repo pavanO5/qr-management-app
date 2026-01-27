@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./supabase";
 
 /* Pages */
@@ -10,7 +10,6 @@ import RiddleManager from "./pages/RiddleManager";
 import ScanQR from "./pages/ScanQR";
 import RiddlePage from "./pages/RiddlePage";
 import TeamManager from "./pages/TeamManager";
-
 
 function App() {
   const [session, setSession] = useState(null);
@@ -33,31 +32,50 @@ function App() {
 
   if (loading) return <p>Loading...</p>;
 
-return (
-  <BrowserRouter>
-    <Routes>
-      {/* If admin OR team logged in */}
-      {session || localStorage.getItem("team_id") ? (
-        <>
-          {/* ADMIN ROUTES */}
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/qr-manager" element={<QRManager />} />
-          <Route path="/riddle-manager" element={<RiddleManager />} />
-          <Route path="/admin/teams" element={<TeamManager />} />
+  const teamId = localStorage.getItem("team_id");
 
-          {/* TEAM ROUTES */}
-          <Route path="/scan" element={<ScanQR />} />
-          <Route path="/riddle" element={<RiddlePage />} />
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* =================== LOGIN =================== */}
+        {!session && !teamId && (
+          <Route path="*" element={<Login />} />
+        )}
 
-          {/* FALLBACK */}
-          <Route path="*" element={<Dashboard />} />
-        </>
-      ) : (
-        <Route path="*" element={<Login />} />
-      )}
-    </Routes>
-  </BrowserRouter>
-);
+        {/* =================== ADMIN =================== */}
+        {session && (
+          <>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/qr-manager" element={<QRManager />} />
+            <Route path="/riddle-manager" element={<RiddleManager />} />
+            <Route path="/admin/teams" element={<TeamManager />} />
+          </>
+        )}
+
+        {/* =================== TEAM =================== */}
+        {teamId && (
+          <>
+            <Route path="/scan" element={<ScanQR />} />
+            <Route path="/riddle" element={<RiddlePage />} />
+          </>
+        )}
+
+        {/* =================== FALLBACK =================== */}
+        <Route
+          path="*"
+          element={
+            session ? (
+              <Navigate to="/" />
+            ) : teamId ? (
+              <Navigate to="/scan" />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;
