@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 function ScanQR({ location }) {
   const navigate = useNavigate();
-  const hasScanned = useRef(false); // ✅ prevents double scan
+  const hasScanned = useRef(false);
 
   useEffect(() => {
     const scanner = new Html5QrcodeScanner(
@@ -14,16 +14,14 @@ function ScanQR({ location }) {
         fps: 10,
         qrbox: { width: 250, height: 250 },
         rememberLastUsedCamera: false,
-        videoConstraints: {
-          facingMode: "environment",
-        },
+        videoConstraints: { facingMode: "environment" },
       },
       false
     );
 
     scanner.render(
       async (decodedText) => {
-        if (hasScanned.current) return; // 🚫 block double scan
+        if (hasScanned.current) return;
         hasScanned.current = true;
 
         await scanner.clear();
@@ -40,6 +38,14 @@ function ScanQR({ location }) {
   const handleScan = async (rawQrValue) => {
     try {
       const qrValue = rawQrValue.trim();
+
+      /* ✅ TEAM VALIDATION */
+      const teamId = localStorage.getItem("team_id");
+      if (!teamId) {
+        alert("Please login as a team first.");
+        navigate("/login");
+        return;
+      }
 
       /* 1️⃣ Fetch QR */
       const { data: qrData, error: qrError } = await supabase
@@ -58,37 +64,26 @@ function ScanQR({ location }) {
         return;
       }
 
-      /* 2️⃣ Get user */
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        alert("User not logged in");
-        return;
-      }
-
-      /* 3️⃣ Save scan log (ONLY ONCE) */
+      /* 2️⃣ Log scan */
       await supabase.from("scans").insert({
         qr_id: qrData.id,
-        user_id: user.id,
+        user_id: teamId, // 👈 TEAM ID, NOT auth user
         latitude: location?.latitude || null,
         longitude: location?.longitude || null,
       });
 
-      /* 4️⃣ Game logic */
+      /* 3️⃣ Game Logic */
       const { error } = await supabase.rpc("handle_qr_scan", {
-        p_user: user.id,
+        p_user: teamId,
         p_qr: qrData.id,
       });
 
       if (error) {
-        console.error(error);
         alert(error.message);
         return;
       }
 
-      /* 5️⃣ Redirect */
+      /* 4️⃣ Redirect */
       navigate("/riddle");
     } catch (err) {
       console.error("Scan error:", err);
