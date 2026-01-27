@@ -9,6 +9,8 @@ import QRManager from "./pages/QRManager";
 import RiddleManager from "./pages/RiddleManager";
 import ScanQR from "./pages/ScanQR";
 import RiddlePage from "./pages/RiddlePage";
+import TeamManager from "./pages/TeamManager";
+
 
 function App() {
   const [session, setSession] = useState(null);
