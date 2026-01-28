@@ -17,16 +17,22 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Admin session
-    supabase.auth.getSession().then(({ data }) => {
+    const load = async () => {
+      const { data } = await supabase.auth.getSession();
       setSession(data.session);
-    });
+      setTeamId(localStorage.getItem("team_id"));
+      setLoading(false);
+    };
 
-    // Team session
-    const team = localStorage.getItem("team_id");
-    if (team) setTeamId(team);
+    load();
 
-    setLoading(false);
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   if (loading) return <p>Loading...</p>;
@@ -34,36 +40,56 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ================= NOT LOGGED IN ================= */}
-        {!session && !teamId && (
-          <>
-            <Route path="*" element={<Login />} />
-          </>
-        )}
+        {/* PUBLIC */}
+        <Route path="/login" element={<Login />} />
 
-        {/* ================= ADMIN ================= */}
-        {session && (
-          <>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/qr-manager" element={<QRManager />} />
-            <Route path="/riddle-manager" element={<RiddleManager />} />
-            <Route path="/admin/teams" element={<TeamManager />} />
+        {/* ADMIN */}
+        <Route
+          path="/"
+          element={
+            session ? <Dashboard /> : <Navigate to="/login" replace />
+          }
+        />
+        <Route
+          path="/qr-manager"
+          element={session ? <QRManager /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/riddle-manager"
+          element={session ? <RiddleManager /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/admin/teams"
+          element={session ? <TeamManager /> : <Navigate to="/login" />}
+        />
 
-            {/* fallback */}
-            <Route path="*" element={<Navigate to="/" />} />
-          </>
-        )}
+        {/* TEAM */}
+        <Route
+          path="/scan"
+          element={
+            teamId ? <ScanQR /> : <Navigate to="/login" replace />
+          }
+        />
+        <Route
+          path="/riddle"
+          element={
+            teamId ? <RiddlePage /> : <Navigate to="/login" replace />
+          }
+        />
 
-        {/* ================= TEAM ================= */}
-        {teamId && !session && (
-          <>
-            <Route path="/scan" element={<ScanQR />} />
-            <Route path="/riddle" element={<RiddlePage />} />
-
-            {/* redirect all to scan */}
-            <Route path="*" element={<Navigate to="/scan" />} />
-          </>
-        )}
+        {/* FALLBACK */}
+        <Route
+          path="*"
+          element={
+            session ? (
+              <Navigate to="/" />
+            ) : teamId ? (
+              <Navigate to="/scan" />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
