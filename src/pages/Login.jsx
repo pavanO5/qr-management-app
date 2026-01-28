@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 function Login() {
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState("admin"); // admin | team
+  const [mode, setMode] = useState("admin");
   const [email, setEmail] = useState("");
   const [teamId, setTeamId] = useState("");
   const [password, setPassword] = useState("");
@@ -33,32 +33,39 @@ function Login() {
     }
 
     if (data?.session) {
-      navigate("/"); // Admin dashboard
+      localStorage.removeItem("team_id"); // 🔥 important
+      navigate("/");
     }
   };
 
   /* ================= TEAM LOGIN ================= */
-const handleTeamLogin = async () => {
-  setLoading(true);
+  const handleTeamLogin = async () => {
+    if (!teamId || !password) {
+      alert("Enter team ID and password");
+      return;
+    }
 
-  const { data, error } = await supabase.rpc("team_login", {
-    p_team_code: teamId,
-    p_password: password,
-    p_device_id: navigator.userAgent,
-  });
+    setLoading(true);
 
-  setLoading(false);
+    const { data, error } = await supabase.rpc("team_login", {
+      p_team_code: teamId.trim(),
+      p_password: password.trim(),
+      p_device_id: navigator.userAgent,
+    });
 
-  if (error) {
-    alert(error.message);
-    return;
-  }
+    setLoading(false);
 
-  localStorage.setItem("team_id", data);
+    if (error) {
+      alert(error.message);
+      return;
+    }
 
-  // ✅ FORCE reload so App.jsx detects team
-  window.location.href = "/scan";
-};
+    // ✅ store team session
+    localStorage.setItem("team_id", data);
+
+    // ✅ important: force navigation (no refresh)
+    navigate("/scan", { replace: true });
+  };
 
   return (
     <div style={{ padding: 30, maxWidth: 400, margin: "auto" }}>
@@ -89,7 +96,7 @@ const handleTeamLogin = async () => {
             style={{ width: "100%", marginBottom: 10 }}
           />
 
-          <button type="button" onClick={handleAdminLogin} disabled={loading}>
+          <button onClick={handleAdminLogin} disabled={loading}>
             Login as Admin
           </button>
         </>
@@ -113,7 +120,7 @@ const handleTeamLogin = async () => {
             style={{ width: "100%", marginBottom: 10 }}
           />
 
-         <button type="button" onClick={handleTeamLogin} disabled={loading}>
+          <button onClick={handleTeamLogin} disabled={loading}>
             Login as Team
           </button>
         </>

@@ -6,12 +6,13 @@ import { useNavigate } from "react-router-dom";
 function ScanQR() {
   const navigate = useNavigate();
   const hasScanned = useRef(false);
+  const scannerRef = useRef(null);
 
   const [location, setLocation] = useState(null);
   const [locationError, setLocationError] = useState(false);
 
   /* =========================
-     GET USER LOCATION
+     GET LOCATION
   ========================= */
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -41,33 +42,43 @@ function ScanQR() {
   if (!location || locationError) {
     return (
       <div style={{ padding: 30, textAlign: "center" }}>
-        <h3>Location Access Required</h3>
+        <h3>Location Required</h3>
         <p>Please allow location access to scan QR</p>
+
         <button onClick={() => window.location.reload()}>
           Retry
         </button>
+
         <br /><br />
-        <button onClick={logout}>Logout</button>
+
+        <button
+          onClick={logout}
+          style={{ background: "crimson", color: "white" }}
+        >
+          Logout
+        </button>
       </div>
     );
   }
 
   /* =========================
-     QR SCANNER
+     QR SCANNER INIT
   ========================= */
   useEffect(() => {
+    if (scannerRef.current) return;
+
     const scanner = new Html5QrcodeScanner(
       "qr-reader",
       {
         fps: 10,
         qrbox: { width: 250, height: 250 },
         rememberLastUsedCamera: false,
-        videoConstraints: {
-          facingMode: "environment",
-        },
+        videoConstraints: { facingMode: "environment" },
       },
       false
     );
+
+    scannerRef.current = scanner;
 
     scanner.render(
       async (decodedText) => {
@@ -82,6 +93,7 @@ function ScanQR() {
 
     return () => {
       scanner.clear().catch(() => {});
+      scannerRef.current = null;
     };
   }, [location]);
 
@@ -91,8 +103,8 @@ function ScanQR() {
   const handleScan = async (rawQrValue) => {
     try {
       const qrValue = rawQrValue.trim();
-
       const teamId = localStorage.getItem("team_id");
+
       if (!teamId) {
         alert("Session expired. Please login again.");
         navigate("/");
@@ -116,7 +128,7 @@ function ScanQR() {
         return;
       }
 
-      /* 2️⃣ Log scan */
+      /* 2️⃣ Log Scan */
       await supabase.from("scans").insert({
         qr_id: qrData.id,
         user_id: teamId,
@@ -124,23 +136,28 @@ function ScanQR() {
         longitude: location.longitude,
       });
 
-      /* 3️⃣ Game Logic (RIDDLE ASSIGNMENT) */
-      const { error } = await supabase.rpc("handle_qr_scan", {
-        p_user: teamId,
-        p_qr: qrData.id,
-      });
+      /* 3️⃣ Assign Riddle */
+      const { error: rpcError } = await supabase.rpc(
+        "handle_qr_scan",
+        {
+          p_user: teamId,
+          p_qr: qrData.id,
+        }
+      );
 
-      if (error) {
-        alert(error.message);
+      if (rpcError) {
+        alert(rpcError.message);
         return;
       }
 
-      /* 4️⃣ Redirect */
-      navigate("/riddle");
+      /* 4️⃣ SAFE REDIRECT */
+      setTimeout(() => {
+        navigate("/riddle");
+      }, 300);
 
     } catch (err) {
       console.error(err);
-      alert("Something went wrong while scanning.");
+      alert("Scan failed");
     }
   };
 

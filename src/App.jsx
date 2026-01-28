@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./supabase";
 
 /* Pages */
@@ -22,7 +22,7 @@ function App() {
       setSession(data.session);
     });
 
-    // Team login
+    // Team session
     const team = localStorage.getItem("team_id");
     if (team) setTeamId(team);
 
@@ -34,28 +34,34 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* NOT LOGGED IN */}
+        {/* ================= NOT LOGGED IN ================= */}
         {!session && !teamId && (
-          <Route path="*" element={<Login />} />
+          <>
+            <Route path="*" element={<Login />} />
+          </>
         )}
 
-        {/* ADMIN ROUTES */}
+        {/* ================= ADMIN ================= */}
         {session && (
           <>
             <Route path="/" element={<Dashboard />} />
             <Route path="/qr-manager" element={<QRManager />} />
             <Route path="/riddle-manager" element={<RiddleManager />} />
             <Route path="/admin/teams" element={<TeamManager />} />
-            <Route path="*" element={<Dashboard />} />
+
+            {/* fallback */}
+            <Route path="*" element={<Navigate to="/" />} />
           </>
         )}
 
-        {/* TEAM ROUTES */}
+        {/* ================= TEAM ================= */}
         {teamId && !session && (
           <>
             <Route path="/scan" element={<ScanQR />} />
             <Route path="/riddle" element={<RiddlePage />} />
-            <Route path="*" element={<ScanQR />} />
+
+            {/* redirect all to scan */}
+            <Route path="*" element={<Navigate to="/scan" />} />
           </>
         )}
       </Routes>
