@@ -36,14 +36,28 @@ function QRManager() {
     setRiddles(rid || []);
   };
 
-  /* ================= INITIAL LOAD + REALTIME ================= */
+  /* ================= INITIAL LOAD + REALTIME (FIXED) ================= */
 
   useEffect(() => {
     fetchAll();
 
-    // ✅ REALTIME LISTENER (LIVE UPDATES)
     const channel = supabase
       .channel("qr-manager-live")
+
+      // ✅ LISTEN WHEN A QR IS SCANNED
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "scans",
+        },
+        () => {
+          fetchAll();
+        }
+      )
+
+      // ✅ LISTEN TO QR CHANGES (ADMIN ACTIONS)
       .on(
         "postgres_changes",
         {
@@ -55,6 +69,7 @@ function QRManager() {
           fetchAll();
         }
       )
+
       .subscribe();
 
     return () => {
@@ -140,7 +155,6 @@ function QRManager() {
 
   const deleteQR = async (id) => {
     if (!window.confirm("Delete this QR?")) return;
-
     await supabase.from("qr_codes").delete().eq("id", id);
     fetchAll();
   };
@@ -174,13 +188,7 @@ function QRManager() {
   return (
     <div style={{ padding: 30 }}>
       {/* ================= HEADER NAVIGATION ================= */}
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          marginBottom: 20,
-        }}
-      >
+      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
         <button onClick={() => navigate("/admin-dashboard")}>
           Admin Dashboard
         </button>
@@ -194,7 +202,7 @@ function QRManager() {
 
       <h2>QR Manager</h2>
 
-      {/* ================= CREATE (EXISTING) ================= */}
+      {/* ================= CREATE ================= */}
       <h3>Create QR</h3>
 
       <input
@@ -227,7 +235,7 @@ function QRManager() {
 
       <hr />
 
-      {/* ================= ADVANCED BULK CREATE ================= */}
+      {/* ================= ADVANCED BULK ================= */}
       <h3>Create Multiple QRs (Advanced)</h3>
 
       <input
@@ -238,13 +246,10 @@ function QRManager() {
         style={{ width: 160, marginRight: 10 }}
       />
 
-      <button onClick={proceedBulkCreate}>
-        Proceed
-      </button>
+      <button onClick={proceedBulkCreate}>Proceed</button>
 
       <hr />
 
-      {/* ================= DELETE ALL ================= */}
       <button
         style={{ background: "red", color: "white", marginBottom: 20 }}
         onClick={deleteAllQR}
@@ -371,9 +376,7 @@ function QRManager() {
               </div>
             ))}
 
-            <button onClick={createBulkQRs}>
-              Create
-            </button>
+            <button onClick={createBulkQRs}>Create</button>
             <button
               onClick={() => setShowBulkModal(false)}
               style={{ marginLeft: 10 }}
