@@ -89,7 +89,7 @@ function ScanQR() {
         .from("scans")
         .insert({
           qr_id: qrData.id,
-          user_id: teamId,
+          team_id: teamId,
           scanned_at: new Date().toISOString(),
         });
 
