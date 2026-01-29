@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
+import { useNavigate } from "react-router-dom";
 
 function RiddleManager() {
+  const navigate = useNavigate(); // ✅ NEW
+
   const [riddles, setRiddles] = useState([]);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [editId, setEditId] = useState(null);
 
-  // ✅ NEW STATES (bulk create)
+  // ✅ BULK CREATE STATES (UNCHANGED)
   const [bulkCount, setBulkCount] = useState("");
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkRiddles, setBulkRiddles] = useState([]);
@@ -60,31 +63,30 @@ function RiddleManager() {
   };
 
   /* =============================
-     DELETE ALL RIDDLES (NEW)
+     DELETE ALL RIDDLES (UNCHANGED)
   ============================= */
-const deleteAllRiddles = async () => {
-  const ok = window.confirm(
-    "Delete ALL riddles? This cannot be undone."
-  );
-  if (!ok) return;
+  const deleteAllRiddles = async () => {
+    const ok = window.confirm(
+      "Delete ALL riddles? This cannot be undone."
+    );
+    if (!ok) return;
 
-  const { error } = await supabase
-    .from("riddles")
-    .delete()
-    .not("id", "is", null);
+    const { error } = await supabase
+      .from("riddles")
+      .delete()
+      .not("id", "is", null);
 
-  if (error) {
-    console.error(error);
-    alert("Failed to delete riddles");
-    return;
-  }
+    if (error) {
+      console.error(error);
+      alert("Failed to delete riddles");
+      return;
+    }
 
-  fetchRiddles();
-};
-
+    fetchRiddles();
+  };
 
   /* =============================
-     BULK CREATE LOGIC (NEW)
+     BULK CREATE LOGIC (UNCHANGED)
   ============================= */
   const proceedBulkCreate = () => {
     const count = parseInt(bulkCount);
@@ -130,6 +132,27 @@ const deleteAllRiddles = async () => {
   ============================= */
   return (
     <div style={{ padding: 30 }}>
+      {/* ================= HEADER NAVIGATION (NEW) ================= */}
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginBottom: 20,
+        }}
+      >
+        <button onClick={() => navigate("/admin-dashboard")}>
+          Admin Dashboard
+        </button>
+
+        <button onClick={() => navigate("/qr-manager")}>
+          QR Manager
+        </button>
+
+        <button onClick={() => navigate("/team-manager")}>
+          Team Manager
+        </button>
+      </div>
+
       <h2>Riddle Management</h2>
 
       {/* EXISTING SINGLE CREATE */}
@@ -151,7 +174,7 @@ const deleteAllRiddles = async () => {
 
       <hr />
 
-      {/* ✅ NEW ACTIONS */}
+      {/* ACTIONS */}
       <button
         onClick={deleteAllRiddles}
         style={{
@@ -177,7 +200,7 @@ const deleteAllRiddles = async () => {
 
       <hr />
 
-      {/* EXISTING RIDDLE LIST */}
+      {/* RIDDLE LIST */}
       {riddles.map((r) => (
         <div
           key={r.id}
@@ -202,9 +225,7 @@ const deleteAllRiddles = async () => {
         </div>
       ))}
 
-      {/* =============================
-         BULK CREATE MODAL
-      ============================= */}
+      {/* ================= BULK CREATE MODAL ================= */}
       {showBulkModal && (
         <div
           style={{
