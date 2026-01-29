@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 function RiddlePage() {
   const [riddle, setRiddle] = useState(null);
-  const [gameFinished, setGameFinished] = useState(false); // ✅ NEW
+  const [gameFinished, setGameFinished] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -19,7 +19,7 @@ function RiddlePage() {
       return;
     }
 
-    // ✅ NEW: check if game is finished
+    // 🔎 Check game status
     const { data: team } = await supabase
       .from("teams")
       .select("game_finished")
@@ -33,7 +33,10 @@ function RiddlePage() {
       return;
     }
 
-    // 🔁 EXISTING LOGIC (UNCHANGED)
+    // ✅ Reset state if not finished
+    setGameFinished(false);
+
+    // 🔁 Existing riddle logic (unchanged)
     const { data, error } = await supabase
       .from("user_riddles")
       .select("riddles(title, riddle)")
@@ -53,9 +56,10 @@ function RiddlePage() {
      INITIAL LOAD + REALTIME
   ============================= */
   useEffect(() => {
+    const teamId = localStorage.getItem("team_id");
     fetchRiddle();
 
-    const channel = supabase
+    const riddleChannel = supabase
       .channel("riddle-updates")
       .on(
         "postgres_changes",
@@ -63,13 +67,29 @@ function RiddlePage() {
           event: "*",
           schema: "public",
           table: "user_riddles",
+          filter: `user_id=eq.${teamId}`,
         },
-        () => fetchRiddle()
+        fetchRiddle
+      )
+      .subscribe();
+
+    const teamChannel = supabase
+      .channel("team-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "teams",
+          filter: `id=eq.${teamId}`,
+        },
+        fetchRiddle
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(riddleChannel);
+      supabase.removeChannel(teamChannel);
     };
   }, []);
 
@@ -88,7 +108,7 @@ function RiddlePage() {
     return <p style={{ textAlign: "center" }}>Loading riddle...</p>;
   }
 
-  // ✅ NEW: GAME FINISHED STATE
+  // 🎉 GAME FINISHED
   if (gameFinished) {
     return (
       <div style={{ padding: 30, textAlign: "center" }}>
@@ -120,17 +140,14 @@ function RiddlePage() {
     );
   }
 
-  // 🔁 EXISTING "NO RIDDLE" STATE (UNCHANGED)
+  // 🟡 NO RIDDLE YET
   if (!riddle) {
     return (
       <div style={{ padding: 30, textAlign: "center" }}>
         <h2>No riddle assigned</h2>
         <p>Please scan a QR code.</p>
 
-        <button
-          onClick={() => navigate("/scan")}
-          style={{ marginTop: 15 }}
-        >
+        <button onClick={() => navigate("/scan")} style={{ marginTop: 15 }}>
           Scan QR
         </button>
 
@@ -153,7 +170,7 @@ function RiddlePage() {
   }
 
   /* =============================
-     MAIN VIEW (UNCHANGED)
+     MAIN VIEW
   ============================= */
   return (
     <div
@@ -180,10 +197,7 @@ function RiddlePage() {
 
       <button
         onClick={() => navigate("/scan")}
-        style={{
-          marginTop: 20,
-          padding: "10px 16px",
-        }}
+        style={{ marginTop: 20, padding: "10px 16px" }}
       >
         Scan Next QR
       </button>
