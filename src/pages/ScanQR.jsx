@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom";
 function ScanQR() {
   const navigate = useNavigate();
   const hasScanned = useRef(false);
-
   const [loading, setLoading] = useState(true);
 
   /* =============================
@@ -19,7 +18,7 @@ function ScanQR() {
       return;
     }
     setLoading(false);
-  }, []);
+  }, [navigate]);
 
   /* =============================
      QR SCANNER
@@ -66,27 +65,40 @@ function ScanQR() {
 
       const qrValue = rawQrValue.trim();
 
-      const { data: qrData, error } = await supabase
+      // Validate QR
+      const { data: qrData, error: qrError } = await supabase
         .from("qr_codes")
         .select("*")
         .eq("qr_value", qrValue)
         .single();
 
-      if (!qrData || error) {
+      if (qrError || !qrData) {
         alert("Invalid QR");
+        hasScanned.current = false;
         return;
       }
 
       if (!qrData.is_active) {
         alert("QR expired");
+        hasScanned.current = false;
         return;
       }
 
-      // Save scan
-      await supabase.from("scans").insert({
-        qr_id: qrData.id,
-        user_id: teamId,
-      });
+      // ✅ INSERT SCAN (CRITICAL FIX)
+      const { error: scanError } = await supabase
+        .from("scans")
+        .insert({
+          qr_id: qrData.id,
+          user_id: teamId,
+          scanned_at: new Date().toISOString(),
+        });
+
+      if (scanError) {
+        console.error("Scan insert failed:", scanError);
+        alert("Scan could not be recorded");
+        hasScanned.current = false;
+        return;
+      }
 
       // Assign riddle
       const { error: rpcError } = await supabase.rpc("handle_qr_scan", {
@@ -96,6 +108,7 @@ function ScanQR() {
 
       if (rpcError) {
         alert(rpcError.message);
+        hasScanned.current = false;
         return;
       }
 
@@ -103,6 +116,7 @@ function ScanQR() {
     } catch (err) {
       console.error(err);
       alert("Scan failed");
+      hasScanned.current = false;
     }
   };
 
