@@ -10,6 +10,7 @@ import RiddleManager from "./pages/RiddleManager";
 import ScanQR from "./pages/ScanQR";
 import RiddlePage from "./pages/RiddlePage";
 import TeamManager from "./pages/TeamManager";
+import Leaderboard from "./pages/Leaderboard"; // ✅ ADD THIS
 
 function App() {
   const [session, setSession] = useState(null);
@@ -43,12 +44,10 @@ function App() {
         {/* PUBLIC */}
         <Route path="/login" element={<Login />} />
 
-        {/* ADMIN */}
+        {/* ADMIN ROUTES */}
         <Route
           path="/"
-          element={
-            session ? <Dashboard /> : <Navigate to="/login" replace />
-          }
+          element={session ? <Dashboard /> : <Navigate to="/login" />}
         />
         <Route
           path="/qr-manager"
@@ -63,18 +62,20 @@ function App() {
           element={session ? <TeamManager /> : <Navigate to="/login" />}
         />
 
-        {/* TEAM */}
+        {/* TEAM ROUTES */}
         <Route
           path="/scan"
-          element={
-            teamId ? <ScanQR /> : <Navigate to="/login" replace />
-          }
+          element={teamId ? <ScanQR /> : <Navigate to="/login" />}
         />
         <Route
           path="/riddle"
-          element={
-            teamId ? <RiddlePage /> : <Navigate to="/login" replace />
-          }
+          element={teamId ? <RiddlePage /> : <Navigate to="/login" />}
+        />
+
+        {/* ✅ NEW LEADERBOARD PAGE */}
+        <Route
+          path="/leaderboard"
+          element={teamId ? <Leaderboard /> : <Navigate to="/login" />}
         />
 
         {/* FALLBACK */}
