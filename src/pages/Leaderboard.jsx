@@ -9,11 +9,26 @@ function Leaderboard() {
 
   useEffect(() => {
     fetchLeaderboard();
+
+    // optional auto refresh every 5 seconds
+    const interval = setInterval(fetchLeaderboard, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchLeaderboard = async () => {
     const { data, error } = await supabase.rpc("get_leaderboard");
-    if (!error) setLeaderboard(data || []);
+
+    if (error) {
+      console.error("Leaderboard error:", error);
+      return;
+    }
+
+    // ensure sorted by scans (highest first)
+    const sortedData = (data || []).sort(
+      (a, b) => b.total_scans - a.total_scans
+    );
+
+    setLeaderboard(sortedData);
   };
 
   return (
@@ -36,7 +51,7 @@ function Leaderboard() {
           }}
         >
           #{index + 1} — Team {team.team_code} —{" "}
-          {team.total_scans} scans{" "}
+          {team.total_scans} scans
           {team.team_id === teamId && " (You)"}
         </div>
       ))}
