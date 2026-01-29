@@ -5,16 +5,13 @@ import { useNavigate } from "react-router-dom";
 function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const navigate = useNavigate();
-  const teamId = localStorage.getItem("team_id");
 
-  useEffect(() => {
-    fetchLeaderboard();
+  // ✅ ensure consistent comparison
+  const teamId = String(localStorage.getItem("team_id") || "");
 
-    // optional auto refresh every 5 seconds
-    const interval = setInterval(fetchLeaderboard, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
+  /* =============================
+     FETCH LEADERBOARD
+  ============================= */
   const fetchLeaderboard = async () => {
     const { data, error } = await supabase.rpc("get_leaderboard");
 
@@ -23,13 +20,51 @@ function Leaderboard() {
       return;
     }
 
-    // ensure sorted by scans (highest first)
-    const sortedData = (data || []).sort(
-      (a, b) => b.total_scans - a.total_scans
-    );
-
-    setLeaderboard(sortedData);
+    setLeaderboard(data || []);
   };
+
+  /* =============================
+     INITIAL LOAD + REALTIME
+  ============================= */
+  useEffect(() => {
+    fetchLeaderboard();
+
+    // ✅ REALTIME LISTENERS
+    const channel = supabase
+      .channel("leaderboard-live")
+
+      // when a QR is scanned
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "scans",
+        },
+        () => {
+          fetchLeaderboard();
+        }
+      )
+
+      // when admin deletes scans / resets game
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "teams",
+        },
+        () => {
+          fetchLeaderboard();
+        }
+      )
+
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <div style={{ padding: 20 }}>
@@ -45,14 +80,18 @@ function Leaderboard() {
             marginBottom: 8,
             borderRadius: 6,
             background:
-              team.team_id === teamId ? "#d1ffe3" : "#f3f3f3",
+              String(team.team_id) === teamId
+                ? "#d1ffe3"
+                : "#f3f3f3",
             fontWeight:
-              team.team_id === teamId ? "bold" : "normal",
+              String(team.team_id) === teamId
+                ? "bold"
+                : "normal",
           }}
         >
           #{index + 1} — Team {team.team_code} —{" "}
           {team.total_scans} scans
-          {team.team_id === teamId && " (You)"}
+          {String(team.team_id) === teamId && " (You)"}
         </div>
       ))}
 
