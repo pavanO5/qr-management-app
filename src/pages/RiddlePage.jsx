@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 function RiddlePage() {
   const [riddle, setRiddle] = useState(null);
+  const [gameFinished, setGameFinished] = useState(false); // ✅ NEW
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -18,6 +19,21 @@ function RiddlePage() {
       return;
     }
 
+    // ✅ NEW: check if game is finished
+    const { data: team } = await supabase
+      .from("teams")
+      .select("game_finished")
+      .eq("id", teamId)
+      .single();
+
+    if (team?.game_finished) {
+      setGameFinished(true);
+      setRiddle(null);
+      setLoading(false);
+      return;
+    }
+
+    // 🔁 EXISTING LOGIC (UNCHANGED)
     const { data, error } = await supabase
       .from("user_riddles")
       .select("riddles(title, riddle)")
@@ -72,6 +88,39 @@ function RiddlePage() {
     return <p style={{ textAlign: "center" }}>Loading riddle...</p>;
   }
 
+  // ✅ NEW: GAME FINISHED STATE
+  if (gameFinished) {
+    return (
+      <div style={{ padding: 30, textAlign: "center" }}>
+        <h1>🎉 Game Finished!</h1>
+        <p>Congratulations! You have completed all the QR challenges.</p>
+
+        <button
+          onClick={() => navigate("/leaderboard")}
+          style={{ marginTop: 15 }}
+        >
+          View Leaderboard
+        </button>
+
+        <br /><br />
+
+        <button
+          onClick={logout}
+          style={{
+            background: "crimson",
+            color: "white",
+            padding: "10px 16px",
+            border: "none",
+            borderRadius: 6,
+          }}
+        >
+          Logout
+        </button>
+      </div>
+    );
+  }
+
+  // 🔁 EXISTING "NO RIDDLE" STATE (UNCHANGED)
   if (!riddle) {
     return (
       <div style={{ padding: 30, textAlign: "center" }}>
@@ -104,7 +153,7 @@ function RiddlePage() {
   }
 
   /* =============================
-     MAIN VIEW
+     MAIN VIEW (UNCHANGED)
   ============================= */
   return (
     <div
