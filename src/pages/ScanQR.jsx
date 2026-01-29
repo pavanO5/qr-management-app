@@ -8,7 +8,6 @@ function ScanQR() {
   const hasScanned = useRef(false);
 
   const [loading, setLoading] = useState(true);
-  const [leaderboard, setLeaderboard] = useState([]);
 
   /* =============================
      CHECK TEAM LOGIN
@@ -20,16 +19,7 @@ function ScanQR() {
       return;
     }
     setLoading(false);
-    fetchLeaderboard();
   }, []);
-
-  /* =============================
-     FETCH LEADERBOARD
-  ============================= */
-  const fetchLeaderboard = async () => {
-    const { data, error } = await supabase.rpc("get_leaderboard");
-    if (!error) setLeaderboard(data || []);
-  };
 
   /* =============================
      QR SCANNER
@@ -99,13 +89,10 @@ function ScanQR() {
       });
 
       // Assign riddle
-      const { error: rpcError } = await supabase.rpc(
-        "handle_qr_scan",
-        {
-          p_user: teamId,
-          p_qr: qrData.id,
-        }
-      );
+      const { error: rpcError } = await supabase.rpc("handle_qr_scan", {
+        p_user: teamId,
+        p_qr: qrData.id,
+      });
 
       if (rpcError) {
         alert(rpcError.message);
@@ -137,9 +124,25 @@ function ScanQR() {
       <div id="qr-reader" style={{ width: "100%" }} />
 
       <button
-        onClick={logout}
+        onClick={() => navigate("/leaderboard")}
         style={{
           marginTop: 15,
+          background: "#1e90ff",
+          color: "white",
+          padding: "10px 16px",
+          border: "none",
+          borderRadius: 6,
+        }}
+      >
+        View Leaderboard
+      </button>
+
+      <br />
+
+      <button
+        onClick={logout}
+        style={{
+          marginTop: 10,
           background: "crimson",
           color: "white",
           padding: "10px 16px",
@@ -149,32 +152,6 @@ function ScanQR() {
       >
         Logout
       </button>
-
-      <hr />
-
-      <h3>🏆 Leaderboard</h3>
-
-      {leaderboard.map((team, index) => (
-        <div
-          key={team.team_id}
-          style={{
-            padding: 10,
-            marginBottom: 6,
-            borderRadius: 6,
-            background:
-              team.team_id === localStorage.getItem("team_id")
-                ? "#d1ffe3"
-                : "#f3f3f3",
-            fontWeight:
-              team.team_id === localStorage.getItem("team_id")
-                ? "bold"
-                : "normal",
-          }}
-        >
-          #{index + 1} — Team {team.team_code} — {team.total_scans} scans{" "}
-          {team.team_id === localStorage.getItem("team_id") && "(You)"}
-        </div>
-      ))}
     </div>
   );
 }
