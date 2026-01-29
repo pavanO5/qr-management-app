@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { QRCodeCanvas } from "qrcode.react";
+import { useNavigate } from "react-router-dom";
 
 function QRManager() {
+  const navigate = useNavigate();
+
   const [qrCodes, setQrCodes] = useState([]);
   const [riddles, setRiddles] = useState([]);
 
@@ -11,7 +14,7 @@ function QRManager() {
   const [maxScans, setMaxScans] = useState(1);
   const [count, setCount] = useState(1);
 
-  // ✅ NEW STATES (ADVANCED BULK)
+  // ✅ ADVANCED BULK STATES (UNCHANGED)
   const [bulkCount, setBulkCount] = useState("");
   const [bulkMaxScans, setBulkMaxScans] = useState(1);
   const [bulkQRs, setBulkQRs] = useState([]);
@@ -33,11 +36,33 @@ function QRManager() {
     setRiddles(rid || []);
   };
 
+  /* ================= INITIAL LOAD + REALTIME ================= */
+
   useEffect(() => {
     fetchAll();
+
+    // ✅ REALTIME LISTENER (LIVE UPDATES)
+    const channel = supabase
+      .channel("qr-manager-live")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qr_codes",
+        },
+        () => {
+          fetchAll();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  /* ================= CREATE QR (EXISTING) ================= */
+  /* ================= CREATE QR (UNCHANGED) ================= */
 
   const createQR = async () => {
     if (!name || !description) {
@@ -64,7 +89,7 @@ function QRManager() {
     fetchAll();
   };
 
-  /* ================= BULK CREATE QR (NEW) ================= */
+  /* ================= BULK CREATE QR (UNCHANGED) ================= */
 
   const proceedBulkCreate = () => {
     const n = parseInt(bulkCount);
@@ -111,7 +136,7 @@ function QRManager() {
     fetchAll();
   };
 
-  /* ================= DELETE ================= */
+  /* ================= DELETE (UNCHANGED) ================= */
 
   const deleteQR = async (id) => {
     if (!window.confirm("Delete this QR?")) return;
@@ -131,7 +156,7 @@ function QRManager() {
     fetchAll();
   };
 
-  /* ================= ASSIGN RIDDLE ================= */
+  /* ================= ASSIGN RIDDLE (UNCHANGED) ================= */
 
   const assignRiddle = async (qrId, riddleId) => {
     await supabase
@@ -142,12 +167,31 @@ function QRManager() {
     fetchAll();
   };
 
-  /* ================= AUTO EXPIRE LOGIC ================= */
+  /* ================= AUTO EXPIRE LOGIC (UNCHANGED) ================= */
 
   const isExpired = (qr) => qr.scans_done >= qr.max_scans;
 
   return (
     <div style={{ padding: 30 }}>
+      {/* ================= HEADER NAVIGATION ================= */}
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginBottom: 20,
+        }}
+      >
+        <button onClick={() => navigate("/admin-dashboard")}>
+          Admin Dashboard
+        </button>
+        <button onClick={() => navigate("/riddle-manager")}>
+          Riddle Manager
+        </button>
+        <button onClick={() => navigate("/team-manager")}>
+          Team Manager
+        </button>
+      </div>
+
       <h2>QR Manager</h2>
 
       {/* ================= CREATE (EXISTING) ================= */}
