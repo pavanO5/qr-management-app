@@ -11,6 +11,12 @@ function QRManager() {
   const [maxScans, setMaxScans] = useState(1);
   const [count, setCount] = useState(1);
 
+  // ✅ NEW STATES (ADVANCED BULK)
+  const [bulkCount, setBulkCount] = useState("");
+  const [bulkMaxScans, setBulkMaxScans] = useState(1);
+  const [bulkQRs, setBulkQRs] = useState([]);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+
   /* ================= FETCH DATA ================= */
 
   const fetchAll = async () => {
@@ -31,7 +37,7 @@ function QRManager() {
     fetchAll();
   }, []);
 
-  /* ================= CREATE QR ================= */
+  /* ================= CREATE QR (EXISTING) ================= */
 
   const createQR = async () => {
     if (!name || !description) {
@@ -58,6 +64,53 @@ function QRManager() {
     fetchAll();
   };
 
+  /* ================= BULK CREATE QR (NEW) ================= */
+
+  const proceedBulkCreate = () => {
+    const n = parseInt(bulkCount);
+    if (!n || n <= 0) {
+      alert("Enter valid number of QRs");
+      return;
+    }
+
+    const temp = Array.from({ length: n }, (_, i) => ({
+      label: `QR ${i + 1}`,
+      description: "",
+    }));
+
+    setBulkQRs(temp);
+    setShowBulkModal(true);
+  };
+
+  const createBulkQRs = async () => {
+    const valid = bulkQRs.filter(
+      (q) => q.description.trim() !== ""
+    );
+
+    if (valid.length === 0) {
+      alert("Please enter at least one description");
+      return;
+    }
+
+    const rows = valid.map((q) => ({
+      qr_value: crypto.randomUUID(),
+      name: q.label,
+      description: q.description,
+      max_scans: bulkMaxScans,
+      scans_done: 0,
+      is_active: true,
+    }));
+
+    await supabase.from("qr_codes").insert(rows);
+
+    setBulkQRs([]);
+    setBulkCount("");
+    setBulkMaxScans(1);
+    setShowBulkModal(false);
+
+    fetchAll();
+  };
+
   /* ================= DELETE ================= */
 
   const deleteQR = async (id) => {
@@ -70,7 +123,11 @@ function QRManager() {
   const deleteAllQR = async () => {
     if (!window.confirm("Delete ALL QR codes?")) return;
 
-    await supabase.from("qr_codes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase
+      .from("qr_codes")
+      .delete()
+      .not("id", "is", null);
+
     fetchAll();
   };
 
@@ -82,19 +139,18 @@ function QRManager() {
       .update({ riddle_id: riddleId })
       .eq("id", qrId);
 
-    fetchAll(); // 🔥 refresh instantly
+    fetchAll();
   };
 
   /* ================= AUTO EXPIRE LOGIC ================= */
-  const isExpired = (qr) => {
-    return qr.scans_done >= qr.max_scans;
-  };
+
+  const isExpired = (qr) => qr.scans_done >= qr.max_scans;
 
   return (
     <div style={{ padding: 30 }}>
       <h2>QR Manager</h2>
 
-      {/* ================= CREATE ================= */}
+      {/* ================= CREATE (EXISTING) ================= */}
       <h3>Create QR</h3>
 
       <input
@@ -124,6 +180,23 @@ function QRManager() {
       />
 
       <button onClick={createQR}>Create QR</button>
+
+      <hr />
+
+      {/* ================= ADVANCED BULK CREATE ================= */}
+      <h3>Create Multiple QRs (Advanced)</h3>
+
+      <input
+        type="number"
+        placeholder="Number of QRs"
+        value={bulkCount}
+        onChange={(e) => setBulkCount(e.target.value)}
+        style={{ width: 160, marginRight: 10 }}
+      />
+
+      <button onClick={proceedBulkCreate}>
+        Proceed
+      </button>
 
       <hr />
 
@@ -181,7 +254,6 @@ function QRManager() {
                 <b> {qr.riddles?.title || "Not Assigned"}</b>
               </p>
 
-              {/* Assign / Change Riddle */}
               <select
                 value={qr.riddle_id || ""}
                 onChange={(e) => assignRiddle(qr.id, e.target.value)}
@@ -206,6 +278,67 @@ function QRManager() {
           );
         })}
       </div>
+
+      {/* ================= BULK CREATE MODAL ================= */}
+      {showBulkModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: 20,
+              width: 400,
+              maxHeight: "80vh",
+              overflowY: "auto",
+              borderRadius: 8,
+            }}
+          >
+            <h3>Create {bulkQRs.length} QRs</h3>
+
+            <label>Max scans for all QRs</label>
+            <input
+              type="number"
+              value={bulkMaxScans}
+              onChange={(e) => setBulkMaxScans(+e.target.value)}
+              style={{ width: "100%", marginBottom: 10 }}
+            />
+
+            {bulkQRs.map((q, i) => (
+              <div key={i} style={{ marginBottom: 10 }}>
+                <label>{q.label}</label>
+                <textarea
+                  rows={2}
+                  style={{ width: "100%" }}
+                  value={q.description}
+                  onChange={(e) => {
+                    const copy = [...bulkQRs];
+                    copy[i].description = e.target.value;
+                    setBulkQRs(copy);
+                  }}
+                />
+              </div>
+            ))}
+
+            <button onClick={createBulkQRs}>
+              Create
+            </button>
+            <button
+              onClick={() => setShowBulkModal(false)}
+              style={{ marginLeft: 10 }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
