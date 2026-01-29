@@ -7,11 +7,14 @@ function RiddlePage() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  /* =============================
+     FETCH CURRENT RIDDLE
+  ============================= */
   const fetchRiddle = async () => {
     const teamId = localStorage.getItem("team_id");
 
     if (!teamId) {
-      setLoading(false);
+      navigate("/login");
       return;
     }
 
@@ -30,10 +33,12 @@ function RiddlePage() {
     setLoading(false);
   };
 
+  /* =============================
+     INITIAL LOAD + REALTIME
+  ============================= */
   useEffect(() => {
     fetchRiddle();
 
-    // ✅ REALTIME UPDATE WHEN RIDDLE CHANGES
     const channel = supabase
       .channel("riddle-updates")
       .on(
@@ -43,9 +48,7 @@ function RiddlePage() {
           schema: "public",
           table: "user_riddles",
         },
-        () => {
-          fetchRiddle();
-        }
+        () => fetchRiddle()
       )
       .subscribe();
 
@@ -54,12 +57,17 @@ function RiddlePage() {
     };
   }, []);
 
-  /* ✅ LOGOUT */
+  /* =============================
+     LOGOUT
+  ============================= */
   const logout = () => {
     localStorage.removeItem("team_id");
-    navigate("/");
+    navigate("/login");
   };
 
+  /* =============================
+     UI STATES
+  ============================= */
   if (loading) {
     return <p style={{ textAlign: "center" }}>Loading riddle...</p>;
   }
@@ -67,14 +75,14 @@ function RiddlePage() {
   if (!riddle) {
     return (
       <div style={{ padding: 30, textAlign: "center" }}>
-        <h2>No riddle found</h2>
-        <p>Please scan a valid QR code.</p>
+        <h2>No riddle assigned</h2>
+        <p>Please scan a QR code.</p>
 
         <button
           onClick={() => navigate("/scan")}
           style={{ marginTop: 15 }}
         >
-          Scan Again
+          Scan QR
         </button>
 
         <br /><br />
@@ -84,8 +92,9 @@ function RiddlePage() {
           style={{
             background: "crimson",
             color: "white",
-            padding: "10px",
+            padding: "10px 16px",
             border: "none",
+            borderRadius: 6,
           }}
         >
           Logout
@@ -94,6 +103,9 @@ function RiddlePage() {
     );
   }
 
+  /* =============================
+     MAIN VIEW
+  ============================= */
   return (
     <div
       style={{
@@ -125,6 +137,22 @@ function RiddlePage() {
         }}
       >
         Scan Next QR
+      </button>
+
+      <br />
+
+      <button
+        onClick={logout}
+        style={{
+          marginTop: 10,
+          background: "crimson",
+          color: "white",
+          padding: "10px 16px",
+          border: "none",
+          borderRadius: 6,
+        }}
+      >
+        Logout
       </button>
     </div>
   );

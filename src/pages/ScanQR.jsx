@@ -7,26 +7,35 @@ function ScanQR() {
   const navigate = useNavigate();
   const hasScanned = useRef(false);
 
-  const [location, setLocation] = useState(null);
-  const [locationError, setLocationError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState([]);
 
-  /* ---------------- LOCATION ---------------- */
+  /* =============================
+     CHECK TEAM LOGIN
+  ============================= */
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-      },
-      () => setLocationError(true),
-      { enableHighAccuracy: true }
-    );
+    const teamId = localStorage.getItem("team_id");
+    if (!teamId) {
+      navigate("/login");
+      return;
+    }
+    setLoading(false);
+    fetchLeaderboard();
   }, []);
 
-  /* ---------------- QR SCANNER ---------------- */
+  /* =============================
+     FETCH LEADERBOARD
+  ============================= */
+  const fetchLeaderboard = async () => {
+    const { data, error } = await supabase.rpc("get_leaderboard");
+    if (!error) setLeaderboard(data || []);
+  };
+
+  /* =============================
+     QR SCANNER
+  ============================= */
   useEffect(() => {
-    if (!location) return;
+    if (loading) return;
 
     const scanner = new Html5QrcodeScanner(
       "qr-reader",
@@ -51,19 +60,21 @@ function ScanQR() {
     return () => {
       scanner.clear().catch(() => {});
     };
-  }, [location]);
+  }, [loading]);
 
-  /* ---------------- MAIN LOGIC ---------------- */
+  /* =============================
+     MAIN SCAN LOGIC
+  ============================= */
   const handleScan = async (rawQrValue) => {
     try {
-      const qrValue = rawQrValue.trim();
       const teamId = localStorage.getItem("team_id");
-
       if (!teamId) {
-        alert("Session expired. Login again.");
+        alert("Session expired");
         navigate("/login");
         return;
       }
+
+      const qrValue = rawQrValue.trim();
 
       const { data: qrData, error } = await supabase
         .from("qr_codes")
@@ -72,7 +83,7 @@ function ScanQR() {
         .single();
 
       if (!qrData || error) {
-        alert("Invalid QR Code");
+        alert("Invalid QR");
         return;
       }
 
@@ -81,17 +92,20 @@ function ScanQR() {
         return;
       }
 
+      // Save scan
       await supabase.from("scans").insert({
         qr_id: qrData.id,
         user_id: teamId,
-        latitude: location.latitude,
-        longitude: location.longitude,
       });
 
-      const { error: rpcError } = await supabase.rpc("handle_qr_scan", {
-        p_user: teamId,
-        p_qr: qrData.id,
-      });
+      // Assign riddle
+      const { error: rpcError } = await supabase.rpc(
+        "handle_qr_scan",
+        {
+          p_user: teamId,
+          p_qr: qrData.id,
+        }
+      );
 
       if (rpcError) {
         alert(rpcError.message);
@@ -105,45 +119,62 @@ function ScanQR() {
     }
   };
 
-  /* ---------------- UI ---------------- */
-  return (
-    <div style={{ padding: 20, textAlign: "center" }}>
-      <h3>Scan QR Code</h3>
+  /* =============================
+     LOGOUT
+  ============================= */
+  const logout = () => {
+    localStorage.removeItem("team_id");
+    navigate("/login");
+  };
 
-      {!location && (
-        <>
-          <p>Waiting for location permission...</p>
-          {locationError && (
-            <>
-              <p style={{ color: "red" }}>
-                Location access is required
-              </p>
-              <button onClick={() => window.location.reload()}>
-                Retry
-              </button>
-            </>
-          )}
-        </>
-      )}
+  /* =============================
+     UI
+  ============================= */
+  return (
+    <div style={{ padding: 20 }}>
+      <h2>Scan QR</h2>
 
       <div id="qr-reader" style={{ width: "100%" }} />
 
       <button
+        onClick={logout}
         style={{
-          marginTop: 20,
+          marginTop: 15,
           background: "crimson",
           color: "white",
           padding: "10px 16px",
           border: "none",
           borderRadius: 6,
         }}
-        onClick={() => {
-          localStorage.removeItem("team_id");
-          navigate("/login");
-        }}
       >
         Logout
       </button>
+
+      <hr />
+
+      <h3>🏆 Leaderboard</h3>
+
+      {leaderboard.map((team, index) => (
+        <div
+          key={team.team_id}
+          style={{
+            padding: 10,
+            marginBottom: 6,
+            borderRadius: 6,
+            background:
+              team.team_id === localStorage.getItem("team_id")
+                ? "#d1ffe3"
+                : "#f3f3f3",
+            fontWeight:
+              team.team_id === localStorage.getItem("team_id")
+                ? "bold"
+                : "normal",
+          }}
+        >
+          #{index + 1} — Team {team.team_code} — {team.total_scans} scans{" "}
+          {team.team_id === localStorage.getItem("team_id") && "(You)"}
+        </div>
+      ))}
     </div>
   );
 }
