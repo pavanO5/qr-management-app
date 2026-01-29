@@ -62,15 +62,26 @@ function RiddleManager() {
   /* =============================
      DELETE ALL RIDDLES (NEW)
   ============================= */
-  const deleteAllRiddles = async () => {
-    const ok = window.confirm(
-      "Delete ALL riddles? This cannot be undone."
-    );
-    if (!ok) return;
+const deleteAllRiddles = async () => {
+  const ok = window.confirm(
+    "Delete ALL riddles? This cannot be undone."
+  );
+  if (!ok) return;
 
-    await supabase.from("riddles").delete().neq("id", "0");
-    fetchRiddles();
-  };
+  const { error } = await supabase
+    .from("riddles")
+    .delete()
+    .not("id", "is", null);
+
+  if (error) {
+    console.error(error);
+    alert("Failed to delete riddles");
+    return;
+  }
+
+  fetchRiddles();
+};
+
 
   /* =============================
      BULK CREATE LOGIC (NEW)
