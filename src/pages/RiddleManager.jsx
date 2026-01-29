@@ -7,6 +7,14 @@ function RiddleManager() {
   const [text, setText] = useState("");
   const [editId, setEditId] = useState(null);
 
+  // ✅ NEW STATES (bulk create)
+  const [bulkCount, setBulkCount] = useState("");
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkRiddles, setBulkRiddles] = useState([]);
+
+  /* =============================
+     FETCH RIDDLES (UNCHANGED)
+  ============================= */
   const fetchRiddles = async () => {
     const { data } = await supabase.from("riddles").select("*");
     setRiddles(data || []);
@@ -16,6 +24,9 @@ function RiddleManager() {
     fetchRiddles();
   }, []);
 
+  /* =============================
+     ADD / UPDATE RIDDLE (UNCHANGED)
+  ============================= */
   const saveRiddle = async () => {
     if (!text) return alert("Enter riddle");
 
@@ -37,6 +48,9 @@ function RiddleManager() {
     fetchRiddles();
   };
 
+  /* =============================
+     DELETE SINGLE RIDDLE (UNCHANGED)
+  ============================= */
   const deleteRiddle = async (id) => {
     const ok = window.confirm("Delete this riddle?");
     if (!ok) return;
@@ -45,10 +59,69 @@ function RiddleManager() {
     fetchRiddles();
   };
 
+  /* =============================
+     DELETE ALL RIDDLES (NEW)
+  ============================= */
+  const deleteAllRiddles = async () => {
+    const ok = window.confirm(
+      "Delete ALL riddles? This cannot be undone."
+    );
+    if (!ok) return;
+
+    await supabase.from("riddles").delete().neq("id", "0");
+    fetchRiddles();
+  };
+
+  /* =============================
+     BULK CREATE LOGIC (NEW)
+  ============================= */
+  const proceedBulkCreate = () => {
+    const count = parseInt(bulkCount);
+    if (!count || count <= 0) {
+      alert("Enter valid number");
+      return;
+    }
+
+    const temp = Array.from({ length: count }, (_, i) => ({
+      title: `Riddle ${i + 1}`,
+      riddle: "",
+    }));
+
+    setBulkRiddles(temp);
+    setShowBulkModal(true);
+  };
+
+  const createBulkRiddles = async () => {
+    const valid = bulkRiddles.filter(
+      (r) => r.riddle.trim() !== ""
+    );
+
+    if (valid.length === 0) {
+      alert("Please enter at least one riddle");
+      return;
+    }
+
+    await supabase.from("riddles").insert(
+      valid.map((r) => ({
+        title: r.title,
+        riddle: r.riddle,
+      }))
+    );
+
+    setBulkCount("");
+    setBulkRiddles([]);
+    setShowBulkModal(false);
+    fetchRiddles();
+  };
+
+  /* =============================
+     UI
+  ============================= */
   return (
     <div style={{ padding: 30 }}>
       <h2>Riddle Management</h2>
 
+      {/* EXISTING SINGLE CREATE */}
       <input
         placeholder="Riddle Title"
         value={title}
@@ -67,8 +140,38 @@ function RiddleManager() {
 
       <hr />
 
+      {/* ✅ NEW ACTIONS */}
+      <button
+        onClick={deleteAllRiddles}
+        style={{
+          background: "crimson",
+          color: "white",
+          marginRight: 10,
+        }}
+      >
+        Delete All Riddles
+      </button>
+
+      <input
+        type="number"
+        placeholder="Number of riddles"
+        value={bulkCount}
+        onChange={(e) => setBulkCount(e.target.value)}
+        style={{ width: 160, marginRight: 10 }}
+      />
+
+      <button onClick={proceedBulkCreate}>
+        Create Multiple Riddles
+      </button>
+
+      <hr />
+
+      {/* EXISTING RIDDLE LIST */}
       {riddles.map((r) => (
-        <div key={r.id} style={{ border: "1px solid #ccc", padding: 10 }}>
+        <div
+          key={r.id}
+          style={{ border: "1px solid #ccc", padding: 10 }}
+        >
           <b>{r.title}</b>
           <p>{r.riddle}</p>
 
@@ -87,6 +190,61 @@ function RiddleManager() {
           </button>
         </div>
       ))}
+
+      {/* =============================
+         BULK CREATE MODAL
+      ============================= */}
+      {showBulkModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: 20,
+              width: 400,
+              maxHeight: "80vh",
+              overflowY: "auto",
+              borderRadius: 8,
+            }}
+          >
+            <h3>Create {bulkRiddles.length} Riddles</h3>
+
+            {bulkRiddles.map((r, i) => (
+              <div key={i} style={{ marginBottom: 10 }}>
+                <label>{r.title}</label>
+                <textarea
+                  rows={2}
+                  style={{ width: "100%" }}
+                  value={r.riddle}
+                  onChange={(e) => {
+                    const copy = [...bulkRiddles];
+                    copy[i].riddle = e.target.value;
+                    setBulkRiddles(copy);
+                  }}
+                />
+              </div>
+            ))}
+
+            <button onClick={createBulkRiddles}>
+              Create
+            </button>
+            <button
+              onClick={() => setShowBulkModal(false)}
+              style={{ marginLeft: 10 }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
