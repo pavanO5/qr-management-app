@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import { useNavigate } from "react-router-dom";
 
 function RiddlePage() {
   const [riddle, setRiddle] = useState(null);
-  const [currentRiddleId, setCurrentRiddleId] = useState(null); // ✅ NEW
   const [gameFinished, setGameFinished] = useState(false);
   const [loading, setLoading] = useState(true);
   const [flashMsg, setFlashMsg] = useState("");
+
+  const currentRiddleIdRef = useRef(null); // ✅ KEY FIX
   const navigate = useNavigate();
 
   /* =============================
@@ -15,13 +16,12 @@ function RiddlePage() {
   ============================= */
   const fetchRiddle = async () => {
     const teamId = localStorage.getItem("team_id");
-
     if (!teamId) {
       navigate("/login");
       return;
     }
 
-    // 🔎 Check game status
+    // Check game finished
     const { data: team } = await supabase
       .from("teams")
       .select("game_finished")
@@ -31,14 +31,14 @@ function RiddlePage() {
     if (team?.game_finished) {
       setGameFinished(true);
       setRiddle(null);
-      setCurrentRiddleId(null);
+      currentRiddleIdRef.current = null;
       setLoading(false);
       return;
     }
 
     setGameFinished(false);
 
-    // 🔁 Fetch riddle (ADD id)
+    // Fetch riddle (include ID)
     const { data, error } = await supabase
       .from("user_riddles")
       .select("riddles(id, title, riddle)")
@@ -47,24 +47,24 @@ function RiddlePage() {
 
     if (error || !data) {
       setRiddle(null);
-      setCurrentRiddleId(null);
+      currentRiddleIdRef.current = null;
     } else {
       setRiddle(data.riddles);
-      setCurrentRiddleId(data.riddles.id); // ✅ CRITICAL
+      currentRiddleIdRef.current = data.riddles.id; // ✅ ALWAYS CURRENT
     }
 
     setLoading(false);
   };
 
   /* =============================
-     INITIAL LOAD + REALTIME
+     REALTIME SUBSCRIPTIONS
   ============================= */
   useEffect(() => {
     const teamId = localStorage.getItem("team_id");
     fetchRiddle();
 
-    // 🔄 When THIS user's riddle changes
-    const riddleChannel = supabase
+    // User riddle updates
+    const userRiddleChannel = supabase
       .channel("user-riddle-updates")
       .on(
         "postgres_changes",
@@ -78,7 +78,7 @@ function RiddlePage() {
       )
       .subscribe();
 
-    // 🔄 When TEAM state changes
+    // Team updates (game finished)
     const teamChannel = supabase
       .channel("team-updates")
       .on(
@@ -93,7 +93,7 @@ function RiddlePage() {
       )
       .subscribe();
 
-    // ✅ FIXED: Only react if MY riddle expired
+    // ✅ CORRECT riddle expiry listener
     const riddleExpiryChannel = supabase
       .channel("riddle-expiry")
       .on(
@@ -104,9 +104,10 @@ function RiddlePage() {
           table: "riddles",
         },
         (payload) => {
+          // 🔒 Only react if MY riddle expired
           if (
             payload.new.is_active === false &&
-            payload.old.id === currentRiddleId
+            payload.old.id === currentRiddleIdRef.current
           ) {
             setFlashMsg(
               "⚠️ This riddle was claimed by another team. Assigning a new riddle..."
@@ -119,11 +120,11 @@ function RiddlePage() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(riddleChannel);
+      supabase.removeChannel(userRiddleChannel);
       supabase.removeChannel(teamChannel);
       supabase.removeChannel(riddleExpiryChannel);
     };
-  }, [currentRiddleId]); // ✅ dependency added
+  }, []);
 
   /* =============================
      LOGOUT
