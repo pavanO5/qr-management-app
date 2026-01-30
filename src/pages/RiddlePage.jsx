@@ -6,6 +6,7 @@ function RiddlePage() {
   const [riddle, setRiddle] = useState(null);
   const [gameFinished, setGameFinished] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [flashMsg, setFlashMsg] = useState(""); // ✅ NEW
   const navigate = useNavigate();
 
   /* =============================
@@ -33,10 +34,9 @@ function RiddlePage() {
       return;
     }
 
-    // ✅ Reset state if not finished
     setGameFinished(false);
 
-    // 🔁 Existing riddle logic (unchanged)
+    // 🔁 Existing riddle fetch (UNCHANGED)
     const { data, error } = await supabase
       .from("user_riddles")
       .select("riddles(title, riddle)")
@@ -59,8 +59,9 @@ function RiddlePage() {
     const teamId = localStorage.getItem("team_id");
     fetchRiddle();
 
+    // 🔄 When THIS user's riddle changes
     const riddleChannel = supabase
-      .channel("riddle-updates")
+      .channel("user-riddle-updates")
       .on(
         "postgres_changes",
         {
@@ -73,6 +74,7 @@ function RiddlePage() {
       )
       .subscribe();
 
+    // 🔄 When TEAM state changes (game finished)
     const teamChannel = supabase
       .channel("team-updates")
       .on(
@@ -87,9 +89,42 @@ function RiddlePage() {
       )
       .subscribe();
 
+    // 🚨 NEW: Listen for RIDDLE EXPIRATION (CRITICAL FIX)
+    const riddleExpiryChannel = supabase
+      .channel("riddle-expiry")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "riddles",
+        },
+        async (payload) => {
+          if (payload.new.is_active === false) {
+            // Ask backend to refresh riddle ONLY if needed
+            const { data } = await supabase.rpc(
+              "refresh_user_riddle",
+              { p_user: teamId }
+            );
+
+            if (data) {
+              setFlashMsg(
+                "⚠️ This riddle expired because another team scanned its QR. A new riddle has been assigned."
+              );
+              fetchRiddle();
+
+              // auto-hide flash after 4s
+              setTimeout(() => setFlashMsg(""), 4000);
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(riddleChannel);
       supabase.removeChannel(teamChannel);
+      supabase.removeChannel(riddleExpiryChannel);
     };
   }, []);
 
@@ -115,10 +150,7 @@ function RiddlePage() {
         <h1>🎉 Game Finished!</h1>
         <p>Congratulations! You have completed all the QR challenges.</p>
 
-        <button
-          onClick={() => navigate("/leaderboard")}
-          style={{ marginTop: 15 }}
-        >
+        <button onClick={() => navigate("/leaderboard")} style={{ marginTop: 15 }}>
           View Leaderboard
         </button>
 
@@ -181,6 +213,22 @@ function RiddlePage() {
         textAlign: "center",
       }}
     >
+      {/* ⚠️ FLASH MESSAGE */}
+      {flashMsg && (
+        <div
+          style={{
+            background: "#fff3cd",
+            color: "#856404",
+            padding: 12,
+            borderRadius: 6,
+            marginBottom: 15,
+            border: "1px solid #ffeeba",
+          }}
+        >
+          {flashMsg}
+        </div>
+      )}
+
       <h2>{riddle.title}</h2>
 
       <div
