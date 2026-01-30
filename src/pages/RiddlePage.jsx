@@ -91,35 +91,23 @@ function RiddlePage() {
 
     // 🚨 NEW: Listen for RIDDLE EXPIRATION (CRITICAL FIX)
     const riddleExpiryChannel = supabase
-      .channel("riddle-expiry")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "riddles",
-        },
-        async (payload) => {
-          if (payload.new.is_active === false) {
-            // Ask backend to refresh riddle ONLY if needed
-            const { data } = await supabase.rpc(
-              "refresh_user_riddle",
-              { p_user: teamId }
-            );
-
-            if (data) {
-              setFlashMsg(
-                "⚠️ This riddle expired because another team scanned its QR. A new riddle has been assigned."
-              );
-              fetchRiddle();
-
-              // auto-hide flash after 4s
-              setTimeout(() => setFlashMsg(""), 4000);
-            }
-          }
-        }
-      )
-      .subscribe();
+    .channel("riddle-expiry")
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "riddles",
+      },
+      () => {
+        setFlashMsg(
+           "⚠️ Your previous riddle is no longer available. Please scan another QR."
+        );
+        fetchRiddle(); // UI refresh only
+        setTimeout(() => setFlashMsg(""), 4000);
+      }
+   )
+  .subscribe();
 
     return () => {
       supabase.removeChannel(riddleChannel);
