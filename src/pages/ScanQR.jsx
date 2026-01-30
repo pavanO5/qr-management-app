@@ -52,7 +52,7 @@ function ScanQR() {
   }, [loading]);
 
   /* =============================
-     MAIN SCAN LOGIC
+     MAIN SCAN LOGIC (FIXED)
   ============================= */
   const handleScan = async (rawQrValue) => {
     try {
@@ -65,10 +65,10 @@ function ScanQR() {
 
       const qrValue = rawQrValue.trim();
 
-      // Validate QR
+      // Validate QR existence only (DO NOT CHECK is_active here)
       const { data: qrData, error: qrError } = await supabase
         .from("qr_codes")
-        .select("*")
+        .select("id")
         .eq("qr_value", qrValue)
         .single();
 
@@ -78,29 +78,8 @@ function ScanQR() {
         return;
       }
 
-      if (!qrData.is_active) {
-        alert("QR expired");
-        hasScanned.current = false;
-        return;
-      }
-
-      // ✅ INSERT SCAN (CRITICAL FIX)
-      const { error: scanError } = await supabase
-        .from("scans")
-        .insert({
-          qr_id: qrData.id,
-          team_id: teamId,
-          scanned_at: new Date().toISOString(),
-        });
-
-      if (scanError) {
-        console.error("Scan insert failed:", scanError);
-        alert("Scan could not be recorded");
-        hasScanned.current = false;
-        return;
-      }
-
-      // Assign riddle
+      // ✅ SINGLE SOURCE OF TRUTH
+      // All logic handled atomically in DB
       const { error: rpcError } = await supabase.rpc("handle_qr_scan", {
         p_user: teamId,
         p_qr: qrData.id,
