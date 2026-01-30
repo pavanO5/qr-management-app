@@ -4,9 +4,10 @@ import { useNavigate } from "react-router-dom";
 
 function RiddlePage() {
   const [riddle, setRiddle] = useState(null);
+  const [currentRiddleId, setCurrentRiddleId] = useState(null); // ✅ NEW
   const [gameFinished, setGameFinished] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [flashMsg, setFlashMsg] = useState(""); // ✅ NEW
+  const [flashMsg, setFlashMsg] = useState("");
   const navigate = useNavigate();
 
   /* =============================
@@ -30,23 +31,26 @@ function RiddlePage() {
     if (team?.game_finished) {
       setGameFinished(true);
       setRiddle(null);
+      setCurrentRiddleId(null);
       setLoading(false);
       return;
     }
 
     setGameFinished(false);
 
-    // 🔁 Existing riddle fetch (UNCHANGED)
+    // 🔁 Fetch riddle (ADD id)
     const { data, error } = await supabase
       .from("user_riddles")
-      .select("riddles(title, riddle)")
+      .select("riddles(id, title, riddle)")
       .eq("user_id", teamId)
       .single();
 
     if (error || !data) {
       setRiddle(null);
+      setCurrentRiddleId(null);
     } else {
       setRiddle(data.riddles);
+      setCurrentRiddleId(data.riddles.id); // ✅ CRITICAL
     }
 
     setLoading(false);
@@ -74,7 +78,7 @@ function RiddlePage() {
       )
       .subscribe();
 
-    // 🔄 When TEAM state changes (game finished)
+    // 🔄 When TEAM state changes
     const teamChannel = supabase
       .channel("team-updates")
       .on(
@@ -89,32 +93,37 @@ function RiddlePage() {
       )
       .subscribe();
 
-    // 🚨 NEW: Listen for RIDDLE EXPIRATION (CRITICAL FIX)
+    // ✅ FIXED: Only react if MY riddle expired
     const riddleExpiryChannel = supabase
-    .channel("riddle-expiry")
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "riddles",
-      },
-      () => {
-        setFlashMsg(
-           "⚠️ Your previous riddle is no longer available. Please scan another QR."
-        );
-        fetchRiddle(); // UI refresh only
-        setTimeout(() => setFlashMsg(""), 4000);
-      }
-   )
-  .subscribe();
+      .channel("riddle-expiry")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "riddles",
+        },
+        (payload) => {
+          if (
+            payload.new.is_active === false &&
+            payload.old.id === currentRiddleId
+          ) {
+            setFlashMsg(
+              "⚠️ This riddle was claimed by another team. Assigning a new riddle..."
+            );
+            fetchRiddle();
+            setTimeout(() => setFlashMsg(""), 4000);
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
       supabase.removeChannel(riddleChannel);
       supabase.removeChannel(teamChannel);
       supabase.removeChannel(riddleExpiryChannel);
     };
-  }, []);
+  }, [currentRiddleId]); // ✅ dependency added
 
   /* =============================
      LOGOUT
@@ -131,7 +140,6 @@ function RiddlePage() {
     return <p style={{ textAlign: "center" }}>Loading riddle...</p>;
   }
 
-  // 🎉 GAME FINISHED
   if (gameFinished) {
     return (
       <div style={{ padding: 30, textAlign: "center" }}>
@@ -160,7 +168,6 @@ function RiddlePage() {
     );
   }
 
-  // 🟡 NO RIDDLE YET
   if (!riddle) {
     return (
       <div style={{ padding: 30, textAlign: "center" }}>
@@ -201,7 +208,6 @@ function RiddlePage() {
         textAlign: "center",
       }}
     >
-      {/* ⚠️ FLASH MESSAGE */}
       {flashMsg && (
         <div
           style={{
