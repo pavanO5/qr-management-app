@@ -9,19 +9,22 @@ function ScanQR() {
   const [loading, setLoading] = useState(true);
 
   /* =============================
-     CHECK TEAM LOGIN
+     CHECK TEAM LOGIN (PERSISTENT)
   ============================= */
   useEffect(() => {
     const teamId = localStorage.getItem("team_id");
+
+    // ✅ user stays logged in across reloads
     if (!teamId) {
-      navigate("/login");
+      navigate("/login", { replace: true });
       return;
     }
+
     setLoading(false);
   }, [navigate]);
 
   /* =============================
-     QR SCANNER
+     QR SCANNER (UNCHANGED LOGIC)
   ============================= */
   useEffect(() => {
     if (loading) return;
@@ -52,7 +55,7 @@ function ScanQR() {
   }, [loading]);
 
   /* =============================
-     MAIN SCAN LOGIC (FIXED)
+     MAIN SCAN LOGIC (DO NOT TOUCH)
   ============================= */
   const handleScan = async (rawQrValue) => {
     try {
@@ -65,7 +68,6 @@ function ScanQR() {
 
       const qrValue = rawQrValue.trim();
 
-      // Validate QR existence only (DO NOT CHECK is_active here)
       const { data: qrData, error: qrError } = await supabase
         .from("qr_codes")
         .select("id")
@@ -78,8 +80,6 @@ function ScanQR() {
         return;
       }
 
-      // ✅ SINGLE SOURCE OF TRUTH
-      // All logic handled atomically in DB
       const { error: rpcError } = await supabase.rpc("handle_qr_scan", {
         p_user: teamId,
         p_qr: qrData.id,
@@ -91,7 +91,7 @@ function ScanQR() {
         return;
       }
 
-      navigate("/riddle");
+      navigate("/riddle", { replace: true });
     } catch (err) {
       console.error(err);
       alert("Scan failed");
@@ -100,51 +100,121 @@ function ScanQR() {
   };
 
   /* =============================
-     LOGOUT
+     LOGOUT (EXPLICIT ONLY)
   ============================= */
   const logout = () => {
     localStorage.removeItem("team_id");
-    navigate("/login");
+    navigate("/login", { replace: true });
   };
 
   /* =============================
      UI
   ============================= */
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Scan QR</h2>
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(135deg, #0f2a44 0%, #1e5fa3 50%, #ffffff 100%)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        padding: 20,
+      }}
+    >
+      {/* ================= HEADER ================= */}
+      <header style={{ textAlign: "center", color: "white" }}>
+        <h1
+          style={{
+            fontSize: 38,
+            fontWeight: 900,
+            letterSpacing: 3,
+          }}
+        >
+          TREASURE HUNT
+        </h1>
+      </header>
 
-      <div id="qr-reader" style={{ width: "100%" }} />
-
-      <button
-        onClick={() => navigate("/leaderboard")}
+      {/* ================= MAIN ================= */}
+      <main
         style={{
-          marginTop: 15,
-          background: "#1e90ff",
-          color: "white",
-          padding: "10px 16px",
-          border: "none",
-          borderRadius: 6,
+          background: "white",
+          borderRadius: 14,
+          padding: 25,
+          maxWidth: 420,
+          margin: "0 auto",
+          boxShadow: "0 15px 40px rgba(0,0,0,0.25)",
+          textAlign: "center",
         }}
       >
-        View Leaderboard
-      </button>
+        <h2
+          style={{
+            fontSize: 26,
+            fontWeight: 800,
+            marginBottom: 15,
+            letterSpacing: 1.5,
+          }}
+        >
+          SCAN QR
+        </h2>
 
-      <br />
+        <div id="qr-reader" style={{ width: "100%" }} />
 
-      <button
-        onClick={logout}
-        style={{
-          marginTop: 10,
-          background: "crimson",
-          color: "white",
-          padding: "10px 16px",
-          border: "none",
-          borderRadius: 6,
-        }}
-      >
-        Logout
-      </button>
+        <button
+          onClick={() => navigate("/leaderboard")}
+          style={{
+            marginTop: 18,
+            width: "100%",
+            background: "#1e5fa3",
+            color: "white",
+            padding: "12px",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: 700,
+            letterSpacing: 1,
+          }}
+        >
+          VIEW LEADERBOARD
+        </button>
+
+        <button
+          onClick={logout}
+          style={{
+            marginTop: 10,
+            width: "100%",
+            background: "crimson",
+            color: "white",
+            padding: "12px",
+            border: "none",
+            borderRadius: 8,
+            fontWeight: 700,
+          }}
+        >
+          LOGOUT
+        </button>
+      </main>
+
+      {/* ================= FOOTER ================= */}
+      <footer style={{ textAlign: "center" }}>
+        <h3
+          style={{
+            fontSize: 20,
+            fontWeight: 900,
+            letterSpacing: 2,
+            marginBottom: 2,
+          }}
+        >
+          KARUKRIT
+        </h3>
+        <p
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.2,
+          }}
+        >
+          A FEST BY DEPARTMENT OF CSE
+        </p>
+      </footer>
     </div>
   );
 }
