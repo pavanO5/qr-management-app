@@ -24,7 +24,7 @@ function Login() {
     const { data: teamId, error: teamError } = await supabase.rpc(
       "team_login",
       {
-        p_team_code: identifier.trim(),
+        p_team_code: identifier.trim(), // lowercase allowed
         p_password: password.trim(),
         p_device_id: navigator.userAgent,
       }
@@ -34,7 +34,7 @@ function Login() {
       localStorage.setItem("team_id", teamId);
       setLoading(false);
       navigate("/scan", { replace: true });
-      return;
+      return; // ✅ CRITICAL
     }
 
     /* ---------- FALLBACK TO ADMIN LOGIN ---------- */
@@ -81,25 +81,11 @@ function Login() {
         }}
       >
         {/* ================= HEADINGS ================= */}
-        <h1
-          style={{
-            fontSize: 42,
-            fontWeight: 900,
-            marginBottom: 5,
-            letterSpacing: 2,
-          }}
-        >
+        <h1 style={{ fontSize: 42, fontWeight: 900, marginBottom: 5 }}>
           WELCOME
         </h1>
 
-        <h2
-          style={{
-            fontSize: 32,
-            fontWeight: 800,
-            marginBottom: 6,
-            letterSpacing: 1.5,
-          }}
-        >
+        <h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 6 }}>
           TREASURE HUNT
         </h2>
 
@@ -108,7 +94,6 @@ function Login() {
             fontSize: 28,
             fontWeight: 900,
             marginBottom: 10,
-            letterSpacing: 2,
             color: "#1e5fa3",
           }}
         >
@@ -155,7 +140,6 @@ function Login() {
             borderRadius: 8,
             border: "1px solid #ccc",
             fontSize: 15,
-            textTransform: "uppercase",
           }}
         />
 
@@ -187,7 +171,6 @@ function Login() {
             fontSize: 16,
             fontWeight: 700,
             cursor: "pointer",
-            letterSpacing: 1,
             opacity: loading ? 0.7 : 1,
           }}
         >
