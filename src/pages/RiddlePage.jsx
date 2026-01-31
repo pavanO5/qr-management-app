@@ -8,8 +8,8 @@ function RiddlePage() {
   const [loading, setLoading] = useState(true);
   const [flashMsg, setFlashMsg] = useState("");
 
-  const currentRiddleIdRef = useRef(null); // ✅ KEY FIX
   const navigate = useNavigate();
+  const lastRiddleIdRef = useRef(null);
 
   /* =============================
      FETCH CURRENT RIDDLE
@@ -21,7 +21,7 @@ function RiddlePage() {
       return;
     }
 
-    // Check game finished
+    // 🔎 Check game finished
     const { data: team } = await supabase
       .from("teams")
       .select("game_finished")
@@ -31,39 +31,49 @@ function RiddlePage() {
     if (team?.game_finished) {
       setGameFinished(true);
       setRiddle(null);
-      currentRiddleIdRef.current = null;
       setLoading(false);
       return;
     }
 
     setGameFinished(false);
 
-    // Fetch riddle (include ID)
+    // 🔁 Fetch assigned riddle
     const { data, error } = await supabase
       .from("user_riddles")
       .select("riddles(id, title, riddle)")
       .eq("user_id", teamId)
       .single();
 
-    if (error || !data) {
-      setRiddle(null);
-      currentRiddleIdRef.current = null;
-    } else {
+    if (!error && data?.riddles) {
+      // Detect reassignment
+      if (
+        lastRiddleIdRef.current &&
+        lastRiddleIdRef.current !== data.riddles.id
+      ) {
+        setFlashMsg(
+          "⚠️ Your previous riddle was taken by another team. New riddle assigned."
+        );
+        setTimeout(() => setFlashMsg(""), 4000);
+      }
+
+      lastRiddleIdRef.current = data.riddles.id;
       setRiddle(data.riddles);
-      currentRiddleIdRef.current = data.riddles.id; // ✅ ALWAYS CURRENT
+    } else {
+      setRiddle(null);
+      lastRiddleIdRef.current = null;
     }
 
     setLoading(false);
   };
 
   /* =============================
-     REALTIME SUBSCRIPTIONS
+     REALTIME LISTENERS
   ============================= */
   useEffect(() => {
     const teamId = localStorage.getItem("team_id");
     fetchRiddle();
 
-    // User riddle updates
+    // ✅ ONLY listen to user_riddles (SAFE)
     const userRiddleChannel = supabase
       .channel("user-riddle-updates")
       .on(
@@ -78,7 +88,7 @@ function RiddlePage() {
       )
       .subscribe();
 
-    // Team updates (game finished)
+    // ✅ Team finished listener
     const teamChannel = supabase
       .channel("team-updates")
       .on(
@@ -93,36 +103,9 @@ function RiddlePage() {
       )
       .subscribe();
 
-    // ✅ CORRECT riddle expiry listener
-    const riddleExpiryChannel = supabase
-      .channel("riddle-expiry")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "riddles",
-        },
-        (payload) => {
-          // 🔒 Only react if MY riddle expired
-          if (
-            payload.new.is_active === false &&
-            payload.old.id === currentRiddleIdRef.current
-          ) {
-            setFlashMsg(
-              "⚠️ This riddle was claimed by another team. Assigning a new riddle..."
-            );
-            fetchRiddle();
-            setTimeout(() => setFlashMsg(""), 4000);
-          }
-        }
-      )
-      .subscribe();
-
     return () => {
       supabase.removeChannel(userRiddleChannel);
       supabase.removeChannel(teamChannel);
-      supabase.removeChannel(riddleExpiryChannel);
     };
   }, []);
 
@@ -177,21 +160,6 @@ function RiddlePage() {
 
         <button onClick={() => navigate("/scan")} style={{ marginTop: 15 }}>
           Scan QR
-        </button>
-
-        <br /><br />
-
-        <button
-          onClick={logout}
-          style={{
-            background: "crimson",
-            color: "white",
-            padding: "10px 16px",
-            border: "none",
-            borderRadius: 6,
-          }}
-        >
-          Logout
         </button>
       </div>
     );
